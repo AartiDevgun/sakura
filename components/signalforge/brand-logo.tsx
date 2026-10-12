@@ -36,15 +36,15 @@ export function BrandLogo({ docked, electrified, onDocked }: BrandLogoProps) {
         src={MARK_SRC}
         alt=""
         className={cn(
-          'absolute inset-[18%] size-[64%] drop-shadow-[0_0_6px_oklch(0.84_0.12_215/0.7)] transition-opacity duration-300',
+          'absolute inset-[18%] size-[64%] drop-shadow-[0_0_8px_rgba(244,114,182,0.75)] transition-opacity duration-300',
           live ? 'opacity-0' : 'opacity-100',
         )}
       />
       {live ? (
         <ElectricLogo
           src={MARK_SRC}
-          color="#e8f7ff"
-          glowColor="#38bdf8"
+          color="#fff0f7"
+          glowColor="#f472b6"
           theme="dark"
           scale={0.62}
           thickness={docked ? 1.2 : 1.8}

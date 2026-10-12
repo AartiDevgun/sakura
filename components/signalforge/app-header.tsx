@@ -19,8 +19,7 @@ export function AppHeader({ visible, backendMode, onReset }: AppHeaderProps) {
     >
       {/* pr-16 reserves the slot the docked Electric Logo occupies. */}
       <div className="mx-auto flex h-16 max-w-3xl items-center gap-3 px-4 pr-16 md:pr-4">
-        <p className="font-mono text-sm font-semibold tracking-tight">SignalForge</p>
-        {backendMode === 'mock' ? <MockBadge label="Mock backend" /> : null}
+        <p className="text-sm font-semibold tracking-[0.2em]">Sakura</p>
         {onReset ? (
           <Button variant="ghost" size="sm" className="ml-auto" onClick={onReset}>
             New research
