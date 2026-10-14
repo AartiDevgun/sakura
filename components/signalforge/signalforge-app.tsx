@@ -77,7 +77,11 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
     setFlow({ step: 'researching', company })
     try {
       const research = await postJson('/api/research', { company }, researchResponseSchema, { signal, mockScenario })
-      setFlow({ step: 'angles', research })
+      if (research.angles.length > 0) {
+        await runInvestigation(research, research.angles[0].id)
+      } else {
+        setFlow({ step: 'angles', research })
+      }
     } catch (error) {
       if (isAbortError(error)) return
       setFlow({ step: 'research-error', company, message: (error as Error).message })
@@ -192,7 +196,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
               </div>
             ) : null}
 
-            <p className="mt-8 text-[9px] uppercase tracking-[0.24em] text-rose-100/30">Scroll nowhere to begin · Search below</p>
+            <p className="mt-8 text-[9px] uppercase tracking-[0.24em] text-rose-100/30">Search a company to begin the investigation</p>
           </div>
         ) : null}
 
