@@ -168,8 +168,13 @@ export async function consumeDailyBudget(
     Number(result[0]) !== 1 ||
     !Number.isFinite(Number(result[1]))
   ) {
+    if (provider === 'groq') {
+      throw new Error(
+        'Daily Groq analysis limit reached. Increase SAKURA_GROQ_DAILY_LIMIT in Vercel Preview within your Groq plan limits, or retry after the daily reset.',
+      )
+    }
     throw new Error(
-      `Daily ${provider} limit reached. Please try again tomorrow.`,
+      'Daily Tavily search limit reached. Increase SAKURA_TAVILY_DAILY_LIMIT in Vercel Preview within your Tavily plan limits, or retry after the daily reset.',
     )
   }
 
