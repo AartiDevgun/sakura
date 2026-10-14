@@ -12,6 +12,7 @@ import {
 } from '@/lib/research/schema'
 import { cn } from '@/lib/utils'
 import { SakuraParticles } from '@/components/sakura-particles'
+import CrystalizedBall from '@/components/CrystalizedBall'
 import { AppHeader } from './app-header'
 import { BrandLogo } from './brand-logo'
 import { CompanyPrompt } from './company-prompt'
@@ -167,6 +168,24 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
             <div className="inline-flex items-center gap-2 rounded-full border border-pink-200/20 bg-black/50 px-3.5 py-2 text-[10px] font-semibold uppercase tracking-[0.21em] text-pink-200/85 shadow-[0_0_32px_rgba(236,72,153,0.06)] backdrop-blur">
               <span className="size-1.5 rounded-full bg-pink-300 shadow-[0_0_10px_rgba(244,114,182,0.85)]" />
               Autonomous financial research
+            </div>
+
+            <div
+              role="img"
+              aria-label="Interactive crystal sphere with an electric pink rim and glowing dust. Move the pointer over it to stir the light."
+              className="relative mt-1 h-52 w-52 sm:h-60 sm:w-60"
+            >
+              <CrystalizedBall
+                preset="plasma"
+                color="#f472b6"
+                theme="dark"
+                size={0.82}
+                particleCount={9500}
+                speed={0.72}
+                interactive
+                hoverStrength={0.78}
+                className="h-full w-full"
+              />
             </div>
 
             <h1 className="mt-7 max-w-4xl text-balance font-serif text-4xl font-bold leading-[1.06] tracking-[-0.045em] text-rose-50 sm:text-6xl md:text-7xl">
