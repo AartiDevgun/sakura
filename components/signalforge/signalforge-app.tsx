@@ -503,13 +503,3 @@ function ReportSection({
   )
 }
 ```
-
-## Instructions
-
-1. Open `components/signalforge/signalforge-app.tsx`.
-2. Press **Ctrl + A** and replace everything with the code above.
-3. Press **Ctrl + S**.
-4. Commit and push to your `sakura-research-v1` branch.
-5. Check the Vercel Preview deployment. Make sure it says **Ready** before visiting it.
-
-This keeps the tunnel behind the text, hides the prompt during research, and removes the old `ResearchProgress` panel from the loading state. The research angle and report screens remain accessible when the request completes.
