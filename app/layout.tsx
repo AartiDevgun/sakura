@@ -7,9 +7,9 @@ const geistSans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
-  title: 'SAKURA : presented by Team Unstoppable',
+  title: 'SAKURA — Autonomous Financial Research',
   description:
-    'Research a company, choose an angle, and get an evidence report with calculations, dates, counterarguments and sources.',
+    'An autonomous financial research investigator that discovers, tests and traces non-obvious financial signals to public evidence.',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   colorScheme: 'dark',
-  themeColor: '#0d1017',
+  themeColor: '#050206',
   width: 'device-width',
   initialScale: 1,
 }
