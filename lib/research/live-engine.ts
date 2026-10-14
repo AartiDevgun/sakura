@@ -33,6 +33,7 @@ type ResearchSession = {
   company: string
   response: ResearchResponse
   evidence: Evidence[]
+  latestInvestigation?: InvestigationResponse
 }
 
 type JsonObject = Record<string, unknown>
@@ -794,7 +795,7 @@ Rules:
   }
 
   if (session && researchId) {
-    await putJson('research-session', researchId, { ...session, evidence: sources }, RESEARCH_SESSION_TTL_SECONDS)
+    await putJson('research-session', researchId, { ...session, evidence: sources, latestInvestigation: response }, RESEARCH_SESSION_TTL_SECONDS)
   }
 
   return response
@@ -838,6 +839,8 @@ export async function liveFollowup(
       '',
       'Company: ' + company,
       'Question: ' + question,
+      'Current discovery: ' + (session.latestInvestigation?.discovery.headline || 'No completed investigation headline is stored.'),
+      'Current thesis: ' + (session.latestInvestigation?.report.thesis || 'No completed investigation thesis is stored.'),
       'Fresh search status: ' + (freshSearchUnavailable
         ? 'Fresh search was unavailable. Answer only from the existing research-session sources and disclose this limitation.'
         : 'Fresh question-focused public-source search was attempted.'),
