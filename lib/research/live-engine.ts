@@ -171,7 +171,7 @@ async function searchWeb(query: string, signal?: AbortSignal): Promise<SearchRes
           query,
           topic: 'general',
           search_depth: 'basic',
-          max_results: 4,
+          max_results: 6,
           include_raw_content: true,
           include_answer: false,
         }),
@@ -196,15 +196,13 @@ async function collectEvidence(
 ): Promise<Evidence[]> {
   // Keep each phase to two focused searches so the daily Tavily budget
   // supports more complete research sessions without sacrificing source breadth.
-  const queries = angle
-    ? [
-        `"${company}" ${angle} annual report financial results`,
-        `${company} ${angle} investor presentation exchange filing competitor industry trend`,
-      ]
-    : [
-        `"${company}" bank NBFC quarterly results deposits advances NPA credit cost provisions annual report`,
-        `"${company}" investor presentation funding mix loan book growth asset quality competitor banks RBI`,
-      ]
+  // One carefully composed search per stage makes the live agent less quota-hungry.
+  // Tavily still returns multiple independent public sources for triangulation.
+  const queries = [
+    angle
+      ? `"${company}" ${angle} annual report quarterly results investor presentation exchange filing competitor alternative explanation`
+      : `"${company}" annual report latest quarterly results investor presentation financial metrics competitors industry trends bank NBFC deposits advances asset quality funding mix`,
+  ]
 
   // Partial search success is useful, but a total failure must not become a fake report.
   const batches = await Promise.allSettled(queries.map(query => searchWeb(query, signal)))
