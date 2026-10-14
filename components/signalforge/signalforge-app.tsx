@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useReducedMotion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import { isAbortError, postJson } from '@/lib/research/client'
 import {
@@ -280,8 +280,10 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                 ) : (
                   <div className="grid gap-3">
                     {flow.research.angles.map((angle, index) => (
-                      <button
+                      <motion.button
                         type="button"
+                        whileTap={{ scale: 0.975, borderRadius: 28 }}
+                        transition={{ type: 'spring', stiffness: 420, damping: 19 }}
                         key={angle.id}
                         onClick={() =>
                           runInvestigation(flow.research, angle.id)
@@ -312,7 +314,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                             ↗
                           </span>
                         </div>
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
                 )}
