@@ -144,7 +144,7 @@ export function ReportDashboard({
                 </div>
               </motion.div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-0 border-y border-white/[0.12] sm:grid-cols-3">
               <MiniMetric icon={<Network size={17} />} label="Evidence trail" value={String((report.evidence ?? []).length) + ' verified passages'} detail="Exact quotes matched to retrieved text" />
               <MiniMetric icon={<ChartNoAxesCombined size={17} />} label="Calculated metrics" value={String(report.calculations.length)} detail="Results calculated by the app" />
               <MiniMetric icon={<CalendarDays size={17} />} label="Timeline events" value={String(report.timeline.length)} detail="Source-linked events" />
