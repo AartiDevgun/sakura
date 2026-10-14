@@ -12,26 +12,30 @@ export function AppHeader({ visible, backendMode, onReset }: AppHeaderProps) {
   return (
     <header
       className={cn(
-        'fixed inset-x-0 top-0 z-40 border-b border-white/[0.07] bg-black/45 backdrop-blur-xl transition-opacity duration-500 motion-reduce:transition-none',
+        'fixed inset-x-0 top-0 z-40 border-b border-white/[0.09] bg-[#080708]/95 transition-opacity duration-300 motion-reduce:transition-none',
         visible ? 'opacity-100' : 'pointer-events-none opacity-0',
       )}
     >
-      {/* pr-16 reserves the slot the docked Electric Logo occupies. */}
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 pr-20 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 pr-20 sm:px-6">
         <div className="min-w-0">
-          <p className="text-sm font-semibold tracking-[0.27em] text-rose-50">SAKURA</p>
-          <p className="mt-0.5 hidden text-[9px] uppercase tracking-[0.17em] text-rose-100/35 sm:block">Autonomous financial investigator</p>
+          <p className="text-sm font-semibold tracking-[0.22em] text-stone-100">SAKURA</p>
+          <p className="mt-0.5 hidden text-[9px] uppercase tracking-[0.16em] text-stone-500 sm:block">Financial research desk</p>
         </div>
-        <span className="hidden rounded-full border border-pink-200/15 bg-pink-200/[0.04] px-3 py-1.5 text-[9px] font-medium uppercase tracking-[0.15em] text-pink-100/60 md:inline-flex">Track A · Financial services</span>
-        <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] px-2.5 py-1.5 text-[9px] uppercase tracking-[0.12em] text-rose-100/45">
-          <span className={'size-1.5 rounded-full ' + (backendMode === 'live' ? 'bg-emerald-300' : 'bg-amber-300')} />
-          {backendMode === 'live' ? 'Live engine' : 'Demo mode'}
-        </span>
-        {onReset ? (
-          <Button variant="ghost" size="sm" className="shrink-0" onClick={onReset}>
-            New research
-          </Button>
-        ) : null}
+
+        <span aria-hidden="true" className="hidden h-7 w-px bg-white/[0.12] md:block" />
+        <span className="hidden text-[10px] uppercase tracking-[0.14em] text-stone-500 md:inline">India · Public markets</span>
+
+        <div className="ml-auto flex items-center gap-3">
+          <span className="inline-flex items-center gap-2 text-[9px] uppercase tracking-[0.13em] text-stone-400 sm:text-[10px]">
+            <span aria-hidden="true" className={'size-1.5 ' + (backendMode === 'live' ? 'bg-emerald-300' : 'bg-amber-300')} />
+            {backendMode === 'live' ? 'Live research' : 'Demo data'}
+          </span>
+          {onReset ? (
+            <Button variant="ghost" size="sm" className="shrink-0 rounded-sm text-stone-300 hover:text-white" onClick={onReset}>
+              New search
+            </Button>
+          ) : null}
+        </div>
       </div>
     </header>
   )
