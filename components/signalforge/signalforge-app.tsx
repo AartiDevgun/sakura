@@ -19,6 +19,7 @@ import { CompanyPrompt } from './company-prompt'
 import { RequestError } from './request-error'
 import { ResearchTunnel } from './research-tunnel'
 import { EvidenceFlipCard } from './evidence-flip-card'
+import { PeekRating } from './peek-rating'
 
 const INTRO_HOLD_MS = 2200
 
@@ -498,6 +499,11 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                     </a>
                   ))}
                 </section>
+
+                <PeekRating
+                  investigationId={flow.investigation.investigationId}
+                  backendMode={flow.investigation.mode}
+                />
 
                 <button
                   type="button"
