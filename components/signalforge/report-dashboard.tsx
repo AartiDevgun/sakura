@@ -59,12 +59,12 @@ export function ReportDashboard({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-pink-200/10 bg-black/35 px-4 py-3 sm:flex sm:items-center sm:gap-4">
+      <div className="rounded-md border border-white/[0.10] bg-black/35 px-4 py-3 sm:flex sm:items-center sm:gap-4">
         <p className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.17em] text-pink-300/60">Hypothesis tested</p>
         <p className="mt-1 text-xs leading-5 text-rose-100/65 sm:mt-0">{selectedAngle?.title || 'The strongest hypothesis supported by the retrieved public evidence'}</p>
       </div>
 
-      <div className="rounded-2xl border border-pink-200/10 bg-black/40 p-2 backdrop-blur-md">
+      <div className="rounded-md border border-white/[0.10] bg-black/40 p-2 ">
         <div className="flex gap-1.5 overflow-x-auto pb-0.5" role="tablist" aria-label="Research report sections">
           {SECTIONS.map((section, index) => {
             const selected = active === section.id
@@ -78,12 +78,12 @@ export function ReportDashboard({
                 aria-selected={selected}
                 aria-controls="sakura-report-panel"
                 onClick={() => setActive(section.id)}
-                className={'relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-pink-300 sm:px-4 ' + (selected ? 'text-zinc-950' : 'text-rose-100/55 hover:bg-white/[0.04] hover:text-rose-50')}
+                className={'relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-sm px-3.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-pink-300 sm:px-4 ' + (selected ? 'text-pink-100' : 'text-rose-100/55 hover:bg-white/[0.04] hover:text-rose-50')}
               >
-                {selected ? <motion.span layoutId="sakura-tab-pill" transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 340, damping: 28 }} className="absolute inset-0 rounded-xl bg-gradient-to-r from-rose-200 to-pink-300" /> : null}
+                {selected ? <span aria-hidden="true" className="absolute inset-x-3 bottom-0 h-px bg-pink-200" /> : null}
                 <Icon size={14} className="relative z-10" />
                 <span className="relative z-10">{section.label}</span>
-                <span className={'relative z-10 hidden rounded-md px-1.5 py-0.5 text-[9px] sm:inline ' + (selected ? 'bg-black/10 text-black/65' : 'bg-white/[0.05] text-rose-100/35')}>{String(index + 1).padStart(2, '0')}</span>
+                <span className={'relative z-10 hidden rounded-md px-1.5 py-0.5 text-[9px] sm:inline ' + (selected ? 'text-pink-200/65' : 'bg-white/[0.05] text-rose-100/35')}>{String(index + 1).padStart(2, '0')}</span>
               </button>
             )
           })}
@@ -100,19 +100,20 @@ export function ReportDashboard({
                 style={{ transformStyle: 'preserve-3d' }}
                 className="grid"
               >
-                <div className="col-start-1 row-start-1 flex min-h-[335px] flex-col rounded-3xl border border-pink-200/20 bg-gradient-to-br from-[#210b19]/95 via-[#0b080b]/95 to-black p-6 shadow-[0_0_70px_rgba(236,72,153,0.07)] sm:min-h-[365px] sm:p-8" style={{ backfaceVisibility: 'hidden' }}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-pink-200/20 bg-pink-200/[0.07] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-pink-200">The discovery</span>
-                    <span className="rounded-full border border-white/10 px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-rose-100/55">{confidenceLabel} evidence strength</span>
+                <div className="col-start-1 row-start-1 flex min-h-[335px] flex-col rounded-md border border-pink-200/20 bg-[#0b0a0b] p-6  sm:min-h-[365px] sm:p-8" style={{ backfaceVisibility: 'hidden' }}>
+                  <div className="flex flex-wrap items-center gap-3 text-[10px] font-medium uppercase tracking-[0.16em]">
+                    <span className="text-pink-200">The discovery</span>
+                    <span aria-hidden="true" className="h-px w-5 bg-white/20" />
+                    <span className="text-stone-400">{confidenceLabel} evidence strength</span>
                   </div>
                   <h3 className="mt-6 text-pretty text-2xl font-semibold leading-tight tracking-tight text-rose-50 sm:text-4xl">{discovery.headline}</h3>
                   <p className="mt-4 max-w-3xl text-sm leading-7 text-rose-100/70 sm:text-base">{discovery.summary}</p>
                   <div className="mt-auto flex flex-wrap items-end justify-between gap-4 pt-7">
                     <p className="max-w-sm text-xs leading-5 text-rose-100/35">A hypothesis tested against public sources—not an investment recommendation.</p>
-                    <button type="button" onClick={() => setFlipped(true)} aria-expanded={flipped} className="inline-flex items-center gap-2 rounded-full border border-pink-200/30 bg-pink-200/[0.08] px-4 py-2.5 text-xs font-semibold text-pink-100 transition hover:border-pink-200/60 hover:bg-pink-200/[0.14] focus-visible:outline-2 focus-visible:outline-pink-300">Turn for the reasoning <ArrowUpRight size={14} /></button>
+                    <button type="button" onClick={() => setFlipped(true)} aria-expanded={flipped} className="inline-flex items-center gap-2 rounded-sm border border-pink-200/30 bg-pink-200/[0.08] px-4 py-2.5 text-xs font-semibold text-pink-100 transition hover:border-pink-200/60 hover:bg-pink-200/[0.14] focus-visible:outline-2 focus-visible:outline-pink-300">Turn for the reasoning <ArrowUpRight size={14} /></button>
                   </div>
                 </div>
-                <div className="col-start-1 row-start-1 flex min-h-[335px] flex-col rounded-3xl border border-pink-200/25 bg-[#090609] p-6 sm:min-h-[365px] sm:p-8" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+                <div className="col-start-1 row-start-1 flex min-h-[335px] flex-col rounded-md border border-white/[0.13] bg-[#0b0a0b] p-6 sm:min-h-[365px] sm:p-8" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-pink-300/75">What the evidence supports</p>
                     <span className="text-xs text-rose-100/35">02 / 02</span>
@@ -129,7 +130,7 @@ export function ReportDashboard({
                       <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-pink-200/60">Verified evidence anchors</p>
                       {report.evidence.slice(0, 2).map((item, index) => {
                         const source = report.sources.find(candidate => candidate.id === item.sourceId)
-                        return <div key={item.sourceId + '-' + index} className="rounded-xl border border-pink-200/10 bg-black/35 p-3">
+                        return <div key={item.sourceId + '-' + index} className="rounded-sm border border-white/[0.10] bg-black/35 p-3">
                           <p className="text-xs leading-5 text-rose-100/65">“{item.quote}”</p>
                           {source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-[10px] text-pink-300 underline underline-offset-4">{source.title} ↗</a> : null}
                         </div>
@@ -138,7 +139,7 @@ export function ReportDashboard({
                   ) : null}
                   <div className="mt-auto flex flex-wrap items-end justify-between gap-4 pt-5">
                     <p className="text-xs text-rose-100/35">Confidence: {discovery.confidenceReason || 'Based on the number and provenance of sources, with limitations shown in the report.'}</p>
-                    <button type="button" onClick={() => setFlipped(false)} aria-expanded={flipped} className="shrink-0 rounded-full border border-pink-200/30 px-4 py-2.5 text-xs font-semibold text-pink-100 transition hover:bg-pink-200/[0.08] focus-visible:outline-2 focus-visible:outline-pink-300">Back to discovery ↶</button>
+                    <button type="button" onClick={() => setFlipped(false)} aria-expanded={flipped} className="shrink-0 rounded-sm border border-pink-200/30 px-4 py-2.5 text-xs font-semibold text-pink-100 transition hover:bg-pink-200/[0.08] focus-visible:outline-2 focus-visible:outline-pink-300">Back to discovery ↶</button>
                   </div>
                 </div>
               </motion.div>
@@ -157,7 +158,7 @@ export function ReportDashboard({
             {report.evidence && report.evidence.length > 0 ? report.evidence.map((item, index) => {
               const source = report.sources.find(candidate => candidate.id === item.sourceId)
               return (
-                <article key={item.sourceId + '-' + index} className="rounded-2xl border border-pink-200/15 bg-black/45 p-5">
+                <article key={item.sourceId + '-' + index} className="rounded-md border border-white/[0.12] bg-black/45 p-5">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-300/70">Claim {String(index + 1).padStart(2, '0')}</p>
                   <h3 className="mt-2 text-sm font-semibold leading-6 text-rose-50">{item.claim}</h3>
                   <blockquote className="mt-3 border-l-2 border-pink-300/55 pl-4 text-sm leading-6 text-rose-100/65">“{item.quote}”</blockquote>
@@ -166,7 +167,7 @@ export function ReportDashboard({
                 </article>
               )
             }) : (
-              <div className="rounded-2xl border border-amber-200/15 bg-amber-950/15 p-5 text-sm leading-6 text-amber-100/65">The model did not return any quotations that passed exact-text verification. Source links are still available under Sources, but the claims should be treated cautiously until the passages can be verified.</div>
+              <div className="rounded-md border border-amber-200/15 bg-amber-950/15 p-5 text-sm leading-6 text-amber-100/65">The model did not return any quotations that passed exact-text verification. Source links are still available under Sources, but the claims should be treated cautiously until the passages can be verified.</div>
             )}
           </div>
         ) : null}
@@ -175,15 +176,15 @@ export function ReportDashboard({
           <div className="space-y-3">
             <SectionHeading eyebrow="Calculations" title="Show the maths, not just the metric" copy="A calculation is included only when both values and their source quotations passed validation." />
             {report.calculations.length > 0 ? report.calculations.map((calc, index) => (
-              <article key={calc.label + index} className="rounded-2xl border border-pink-200/15 bg-black/45 p-5">
+              <article key={calc.label + index} className="rounded-md border border-white/[0.12] bg-black/45 p-5">
                 <p className="text-sm font-semibold text-rose-50">{calc.label}</p>
                 <p className="mt-3 text-3xl font-semibold tracking-tight text-pink-200">{calc.result}</p>
-                <p className="mt-2 rounded-lg bg-white/[0.035] px-3 py-2 font-mono text-xs leading-5 text-rose-100/50">{calc.formula}</p>
+                <p className="mt-2 rounded-sm bg-white/[0.035] px-3 py-2 font-mono text-xs leading-5 text-rose-100/50">{calc.formula}</p>
                 <p className="mt-3 text-sm leading-6 text-rose-100/65">{calc.interpretation}</p>
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
                   {calc.inputs.map((input, i) => {
                     const source = report.sources.find(candidate => candidate.id === input.sourceId)
-                    return <div key={input.name + i} className="rounded-xl border border-white/[0.07] p-3"><p className="text-[10px] uppercase tracking-[0.15em] text-rose-100/35">{input.name}</p><p className="mt-1 text-sm font-semibold text-rose-50">{input.value}</p>{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs text-pink-300 underline underline-offset-4">{source.title} ↗</a> : null}</div>
+                    return <div key={input.name + i} className="rounded-sm border border-white/[0.07] p-3"><p className="text-[10px] uppercase tracking-[0.15em] text-rose-100/35">{input.name}</p><p className="mt-1 text-sm font-semibold text-rose-50">{input.value}</p>{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs text-pink-300 underline underline-offset-4">{source.title} ↗</a> : null}</div>
                   })}
                 </div>
               </article>
@@ -198,7 +199,7 @@ export function ReportDashboard({
               <div className="relative space-y-3 before:absolute before:bottom-5 before:left-[10px] before:top-5 before:w-px before:bg-pink-200/20">
                 {report.timeline.map((event, index) => {
                   const source = report.sources.find(candidate => candidate.id === event.sourceId)
-                  return <article key={event.date + index} className="relative pl-8"><span className="absolute left-[5px] top-5 size-[11px] rounded-full border border-pink-200/65 bg-[#180c14] shadow-[0_0_12px_rgba(244,114,182,0.25)]" /><div className="rounded-2xl border border-pink-200/12 bg-black/45 p-4"><p className="text-xs font-semibold tracking-wide text-pink-300">{event.date}</p><p className="mt-2 text-sm leading-6 text-rose-50/80">{event.event}</p>{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-pink-300 underline underline-offset-4">{source.publisher || source.title} ↗</a> : null}</div></article>
+                  return <article key={event.date + index} className="relative pl-8"><span className="absolute left-[5px] top-5 size-[11px] rounded-sm border border-pink-200/65 bg-[#180c14] shadow-[0_0_12px_rgba(244,114,182,0.25)]" /><div className="rounded-md border border-white/[0.10] bg-black/45 p-4"><p className="text-xs font-semibold tracking-wide text-pink-300">{event.date}</p><p className="mt-2 text-sm leading-6 text-rose-50/80">{event.event}</p>{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-pink-300 underline underline-offset-4">{source.publisher || source.title} ↗</a> : null}</div></article>
                 })}
               </div>
             ) : <EmptyState title="No supported timeline returned" copy="The available material was not sufficient to present a reliable sequence of events." />}
@@ -208,7 +209,7 @@ export function ReportDashboard({
         {active === 'challenge' ? (
           <div className="space-y-5">
             <SectionHeading eyebrow="Self-falsification" title="Try to break the conclusion" copy="A strong discovery survives plausible alternative explanations—and states what future evidence could overturn it." />
-            <div className="rounded-2xl border border-amber-200/15 bg-amber-950/10 p-5">
+            <div className="rounded-md border border-amber-200/15 bg-amber-950/10 p-5">
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-100/65">Falsification condition</p>
               <p className="mt-2 text-sm leading-7 text-rose-50/80">{report.falsification.condition}</p>
               {report.falsification.metric ? <p className="mt-3 text-xs text-amber-100/55">Monitor: {report.falsification.metric}</p> : null}
@@ -229,17 +230,17 @@ export function ReportDashboard({
           <div className="space-y-3">
             <SectionHeading eyebrow="Public evidence" title="Source ledger" copy="Source classification indicates apparent provenance, not guaranteed accuracy. Independent URLs can still repeat the same underlying claim." />
             {report.sources.map((source, index) => (
-              <a key={source.id} href={source.url} target="_blank" rel="noopener noreferrer" className="group block rounded-2xl border border-pink-200/12 bg-black/45 p-4 transition hover:border-pink-200/35 hover:bg-pink-950/15 sm:p-5">
+              <a key={source.id} href={source.url} target="_blank" rel="noopener noreferrer" className="group block rounded-md border border-white/[0.10] bg-black/45 p-4 transition hover:border-pink-200/35 hover:bg-pink-950/15 sm:p-5">
                 <div className="flex items-start gap-3">
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-xs text-rose-100/50">{String(index + 1).padStart(2, '0')}</span>
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-sm border border-white/10 text-xs text-rose-100/50">{String(index + 1).padStart(2, '0')}</span>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium leading-6 text-rose-50/90 group-hover:text-pink-100">{source.title}</p>
                     <p className="mt-1 break-all text-xs text-pink-300/55">{source.publisher || source.url}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {source.sourceTier ? <span className="rounded-full border border-pink-200/15 px-2.5 py-1 text-[9px] uppercase tracking-[0.13em] text-rose-100/60">{source.sourceTier} source</span> : null}
-                      {source.sourceType ? <span className="rounded-full border border-white/10 px-2.5 py-1 text-[9px] uppercase tracking-[0.13em] text-rose-100/40">{source.sourceType.replace(/_/g, ' ')}</span> : null}
-                      {source.publishedAt ? <span className="rounded-full border border-white/10 px-2.5 py-1 text-[9px] text-rose-100/40">{source.publishedAt}</span> : null}
-                      {cited.has(source.id) ? <span className="rounded-full bg-pink-200/10 px-2.5 py-1 text-[9px] uppercase tracking-[0.13em] text-pink-200">Passage verified</span> : null}
+                      {source.sourceTier ? <span className="rounded-sm border border-white/[0.12] px-2.5 py-1 text-[9px] uppercase tracking-[0.13em] text-rose-100/60">{source.sourceTier} source</span> : null}
+                      {source.sourceType ? <span className="rounded-sm border border-white/10 px-2.5 py-1 text-[9px] uppercase tracking-[0.13em] text-rose-100/40">{source.sourceType.replace(/_/g, ' ')}</span> : null}
+                      {source.publishedAt ? <span className="rounded-sm border border-white/10 px-2.5 py-1 text-[9px] text-rose-100/40">{source.publishedAt}</span> : null}
+                      {cited.has(source.id) ? <span className="rounded-sm bg-pink-200/10 px-2.5 py-1 text-[9px] uppercase tracking-[0.13em] text-pink-200">Passage verified</span> : null}
                     </div>
                   </div>
                   <ArrowUpRight size={16} className="mt-1 shrink-0 text-rose-100/25 group-hover:text-pink-200" />
@@ -251,20 +252,20 @@ export function ReportDashboard({
       </div>
 
       <PeekRating investigationId={investigation.investigationId} backendMode={investigation.mode} />
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-pink-200/10 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.10] pt-4">
         <p className="text-xs leading-5 text-rose-100/35">No investment recommendation. Findings may be incomplete or wrong.</p>
-        <button type="button" onClick={onExploreAngles} className="inline-flex items-center gap-2 rounded-full border border-pink-200/20 px-4 py-2.5 text-xs font-medium text-pink-100 transition hover:border-pink-200/45 hover:bg-pink-200/[0.05]">Explore another angle <ArrowUpRight size={14} /></button>
+        <button type="button" onClick={onExploreAngles} className="inline-flex items-center gap-2 rounded-sm border border-pink-200/20 px-4 py-2.5 text-xs font-medium text-pink-100 transition hover:border-pink-200/45 hover:bg-pink-200/[0.05]">Explore another angle <ArrowUpRight size={14} /></button>
       </div>
     </section>
   )
 }
 
 function StatChip({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border border-pink-200/12 bg-black/45 px-3 py-2"><p className="text-[9px] uppercase tracking-[0.14em] text-rose-100/35">{label}</p><p className="mt-1 text-sm font-semibold text-rose-50">{value}</p></div>
+  return <div className="rounded-sm border border-white/[0.10] bg-black/45 px-3 py-2"><p className="text-[9px] uppercase tracking-[0.14em] text-rose-100/35">{label}</p><p className="mt-1 text-sm font-semibold text-rose-50">{value}</p></div>
 }
 
 function MiniMetric({ icon, label, value, detail }: { icon: React.ReactNode; label: string; value: string; detail: string }) {
-  return <div className="rounded-2xl border border-pink-200/12 bg-black/45 p-4"><span className="text-pink-300/75">{icon}</span><p className="mt-3 text-[10px] uppercase tracking-[0.17em] text-rose-100/40">{label}</p><p className="mt-1 text-lg font-semibold text-rose-50">{value}</p><p className="mt-1 text-xs leading-5 text-rose-100/35">{detail}</p></div>
+  return <div className="border-r border-white/[0.12] px-4 py-4 first:pl-0 last:border-r-0"><span className="text-stone-500">{icon}</span><p className="mt-3 text-[9px] uppercase tracking-[0.14em] text-stone-500">{label}</p><p className="mt-1 text-lg font-medium text-stone-100">{value}</p><p className="mt-1 text-xs leading-5 text-stone-500">{detail}</p></div>
 }
 
 function SectionHeading({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) {
@@ -272,5 +273,5 @@ function SectionHeading({ eyebrow, title, copy }: { eyebrow: string; title: stri
 }
 
 function EmptyState({ title, copy }: { title: string; copy: string }) {
-  return <div className="rounded-2xl border border-white/10 bg-black/40 p-6"><p className="font-medium text-rose-50/75">{title}</p><p className="mt-2 text-sm leading-6 text-rose-100/45">{copy}</p></div>
+  return <div className="rounded-md border border-white/10 bg-black/40 p-6"><p className="font-medium text-rose-50/75">{title}</p><p className="mt-2 text-sm leading-6 text-rose-100/45">{copy}</p></div>
 }
