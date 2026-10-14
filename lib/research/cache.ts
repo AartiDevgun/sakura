@@ -170,11 +170,11 @@ export async function consumeDailyBudget(
   ) {
     if (provider === 'groq') {
       throw new Error(
-        'Daily Groq analysis limit reached. Increase SAKURA_GROQ_DAILY_LIMIT in Vercel Preview within your Groq plan limits, or retry after the daily reset.',
+        'Daily Groq analysis allowance reached. It resets at 05:30 IST. Increase SAKURA_GROQ_DAILY_LIMIT in Vercel Preview only within your Groq plan limits, or retry after reset.',
       )
     }
     throw new Error(
-      'Daily Tavily search limit reached. Increase SAKURA_TAVILY_DAILY_LIMIT in Vercel Preview within your Tavily plan limits, or retry after the daily reset.',
+      'Daily Tavily search allowance reached. It resets at 05:30 IST. Increase SAKURA_TAVILY_DAILY_LIMIT in Vercel Preview only within your Tavily plan limits, or retry after reset.',
     )
   }
 
