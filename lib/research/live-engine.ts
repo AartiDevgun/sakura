@@ -51,6 +51,71 @@ function text(value: unknown, fallback = ''): string {
 
 function slug(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+}type SourceClassification = {
+  sourceType: NonNullable<Source['sourceType']>
+  sourceTier: NonNullable<Source['sourceTier']>
+}
+
+function matchesDomain(host: string, domains: string[]): boolean {
+  return domains.some(
+    domain => host === domain || host.endsWith(`.${domain}`),
+  )
+}
+
+function classifySource(host: string): SourceClassification {
+  const exchanges = [
+    'nseindia.com',
+    'bseindia.com',
+  ]
+
+  const regulators = [
+    'sebi.gov.in',
+    'rbi.org.in',
+    'mca.gov.in',
+    'pib.gov.in',
+    'mospi.gov.in',
+    'finance.gov.in',
+  ]
+
+  const financialMedia = [
+    'reuters.com',
+    'bloomberg.com',
+    'moneycontrol.com',
+    'economictimes.indiatimes.com',
+    'business-standard.com',
+    'livemint.com',
+    'financialexpress.com',
+    'thehindubusinessline.com',
+    'cnbctv18.com',
+    'ft.com',
+    'wsj.com',
+  ]
+
+  const industrySources = [
+    'crisil.com',
+    'icra.in',
+    'careedge.in',
+    'ibef.org',
+    'investindia.gov.in',
+  ]
+
+  if (matchesDomain(host, exchanges)) {
+    return { sourceType: 'exchange', sourceTier: 'primary' }
+  }
+
+  if (matchesDomain(host, regulators)) {
+    return { sourceType: 'regulator', sourceTier: 'primary' }
+  }
+
+  if (matchesDomain(host, financialMedia)) {
+    return { sourceType: 'financial_media', sourceTier: 'secondary' }
+  }
+
+  if (matchesDomain(host, industrySources)) {
+    return { sourceType: 'industry_source', sourceTier: 'secondary' }
+  }
+
+  return { sourceType: 'other', sourceTier: 'unverified' }
 }
 
 function validIndex(value: unknown, length: number): number | undefined {
@@ -136,30 +201,47 @@ async function collectEvidence(
     } catch {
       continue;
     }
-    url.hash = '';
-    for (const key of [...url.searchParams.keys()]) {
-      if (/^(utm_|gclid$|fbclid$)/i.test(key)) url.searchParams.delete(key);
-    }
-    const canonicalUrl = url.toString();
-    if (unique.has(canonicalUrl)) continue;
-    const content = text(item.raw_content, text(item.content));
-    if (!content) continue;
-    const host = url.hostname.replace(/^www\./, '');
-    const official = /(^|\.)((nseindia|bseindia|sebi)\.com|rbi\.org\.in|sebi\.gov\.in)$/.test(host);
-    unique.set(canonicalUrl, {
-      source: {
-        id: '',
-        title: item.title.trim().slice(0, 300),
-        url: canonicalUrl,
-        publisher: host,
-        publishedAt: text(item.published_date) || undefined,
-        accessedAt: new Date().toISOString(),
-      },
-      content: content.slice(0, 4500),
-      score: (typeof item.score === 'number' ? item.score : 0) + (official ? 0.3 : 0),
-      host,
-    });
+  url.hash = ''
+
+for (const key of [...url.searchParams.keys()]) {
+  if (/^(utm_|gclid$|fbclid$)/i.test(key)) {
+    url.searchParams.delete(key)
   }
+}
+
+const canonicalUrl = url.toString()
+
+if (unique.has(canonicalUrl)) continue
+
+const content = text(item.raw_content, text(item.content))
+if (!content) continue
+
+const host = url.hostname.replace(/^www\./, '')
+const classification = classifySource(host)
+
+unique.set(canonicalUrl, {
+  source: {
+    id: '',
+    title: item.title.trim().slice(0, 300),
+    url: canonicalUrl,
+    publisher: host,
+    publishedAt: text(item.published_date) || undefined,
+    accessedAt: new Date().toISOString(),
+    sourceType: classification.sourceType,
+    sourceTier: classification.sourceTier,
+  },
+  content: content.slice(0, 4500),
+  score:
+    (typeof item.score === 'number' ? item.score : 0) +
+    (classification.sourceTier === 'primary'
+      ? 0.3
+      : classification.sourceTier === 'secondary'
+        ? 0.1
+        : 0),
+  host,
+});
+  }
+  
   const results = [...unique.values()]
     .sort((a, b) => b.score - a.score)
     .slice(0, 10);
