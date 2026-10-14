@@ -59,7 +59,7 @@ export function CompanyPrompt({
           htmlFor={inputId}
           className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-200/80"
         >
-          Enter company name
+          Search a NIFTY 50 company
         </Label>
 
         <div className="group relative rounded-2xl border border-pink-300/25 bg-zinc-950/70 p-2 shadow-[0_0_35px_rgba(236,72,153,0.07)] transition-all duration-300 focus-within:border-pink-300/60 focus-within:shadow-[0_0_35px_rgba(236,72,153,0.14)]">
@@ -72,7 +72,7 @@ export function CompanyPrompt({
                 name="company"
                 value={company}
                 onChange={event => setCompany(event.target.value)}
-                placeholder="e.g. Hindustan Unilever Limited"
+                placeholder="e.g. HDFC Bank, ICICI Bank, Bajaj Finance"
                 autoComplete="organization"
                 maxLength={120}
                 disabled={busy}
@@ -109,7 +109,7 @@ export function CompanyPrompt({
         ) : null}
 
         <p className="text-xs leading-relaxed text-rose-100/45">
-          Public financial evidence · Independent source checks · Sceptical analysis
+          Public filings · Independent source checks · Evidence-led analysis
         </p>
       </div>
 
