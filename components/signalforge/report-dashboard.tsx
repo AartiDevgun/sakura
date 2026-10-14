@@ -11,7 +11,7 @@ import { PeekRating } from './peek-rating'
 type SectionKey = 'discovery' | 'evidence' | 'numbers' | 'timeline' | 'challenge' | 'sources'
 
 const SECTIONS: { id: SectionKey; label: string; icon: typeof FileText; note: string }[] = [
-  { id: 'discovery', label: 'Discovery', icon: SparkIcon, note: 'The signal' },
+  { id: 'discovery', label: 'Discovery', icon: CircleHelp, note: 'The signal' },
   { id: 'evidence', label: 'Evidence trail', icon: Network, note: 'What supports it' },
   { id: 'numbers', label: 'Numbers', icon: ChartNoAxesCombined, note: 'Calculated changes' },
   { id: 'timeline', label: 'Timeline', icon: CalendarDays, note: 'When it emerged' },
@@ -19,9 +19,6 @@ const SECTIONS: { id: SectionKey; label: string; icon: typeof FileText; note: st
   { id: 'sources', label: 'Sources', icon: BookOpen, note: 'Public documents' },
 ]
 
-function SparkIcon(props: React.ComponentProps<typeof FileText>) {
-  return <CircleHelp {...props} />
-}
 
 export function ReportDashboard({
   research,
