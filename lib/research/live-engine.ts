@@ -189,6 +189,15 @@ async function searchWeb(query: string, signal?: AbortSignal): Promise<SearchRes
   )
 }
 
+async function cachedSearchOnly(query: string): Promise<SearchResult[]> {
+  try {
+    // This path can reuse existing public-search cache entries but never calls Tavily.
+    return (await getJson<SearchResult[]>('tavily-search', query.trim().toLowerCase())) ?? []
+  } catch {
+    return []
+  }
+}
+
 async function collectEvidence(
   company: string,
   angle?: string,
@@ -207,13 +216,36 @@ async function collectEvidence(
   // Partial search success is useful, but a total failure must not become a fake report.
   const batches = await Promise.allSettled(queries.map(query => searchWeb(query, signal)))
   const rejected = batches.filter(batch => batch.status === 'rejected')
-  const candidates = batches.flatMap(batch =>
+  let candidates = batches.flatMap(batch =>
     batch.status === 'fulfilled' ? batch.value : [],
   )
 
   if (candidates.length === 0 && rejected.length > 0) {
     const firstReason = rejected[0]
-    if (firstReason.status === 'rejected' && firstReason.reason instanceof Error) {
+    const tavilyBudgetSpent = batches.some(
+      batch =>
+        batch.status === 'rejected' &&
+        batch.reason instanceof Error &&
+        /daily tavily search (?:allowance|limit) reached/i.test(batch.reason.message),
+    )
+
+    if (tavilyBudgetSpent) {
+      // Compatibility fallback for recent cache entries created by older query templates.
+      // This does not make any new provider request and never fabricates source data.
+      const legacyQueries = angle
+        ? [
+            `"${company}" ${angle} annual report financial results`,
+            `${company} ${angle} investor presentation exchange filing competitor industry trend`,
+          ]
+        : [
+            `${company} annual report latest quarterly financial results investor presentation`,
+            `${company} margins working capital revenue segments competitors industry trends`,
+          ]
+      const cached = await Promise.all(legacyQueries.map(cachedSearchOnly))
+      candidates = cached.flat()
+    }
+
+    if (candidates.length === 0 && firstReason.status === 'rejected' && firstReason.reason instanceof Error) {
       throw firstReason.reason
     }
   }
