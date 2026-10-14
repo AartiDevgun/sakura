@@ -18,6 +18,7 @@ import { BrandLogo } from './brand-logo'
 import { CompanyPrompt } from './company-prompt'
 import { RequestError } from './request-error'
 import { ResearchTunnel } from './research-tunnel'
+import { EvidenceFlipCard } from './evidence-flip-card'
 
 const INTRO_HOLD_MS = 2200
 
@@ -428,32 +429,21 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                   {flow.investigation.report.counterarguments.length ? (
                     <div className="space-y-4">
                       {flow.investigation.report.counterarguments.map(
-                        (item, index) => (
-                          <div key={`${item.argument}-${index}`}>
-                            <p className="text-sm font-medium text-pink-50">
-                              {item.argument}
-                            </p>
-                            <p className="mt-1 text-sm leading-6 text-rose-100/60">
-                              {item.assessment}
-                            </p>
-                            {item.sourceId ? (() => {
-                              const source = flow.investigation.report.sources.find(
-                                candidate => candidate.id === item.sourceId,
-                              )
-                              return source ? (
-                                <a
-                                  href={source.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="mt-1 inline-block text-xs text-pink-300 underline decoration-pink-300/30 underline-offset-4"
-                                >
-                                  Source: {source.publisher || source.title} ↗
-                                </a>
-                              ) : null
-                            })() : null}
-                          </div>
-                        ),
-                      )}
+                        (item, index) => {
+                          const source = flow.investigation.report.sources.find(
+                            candidate => candidate.id === item.sourceId,
+                          )
+                          return (
+                            <EvidenceFlipCard
+                              key={`${item.argument}-${index}`}
+                              argument={item.argument}
+                              assessment={item.assessment}
+                              sourceUrl={source?.url}
+                              sourceLabel={source ? `Source: ${source.publisher || source.title}` : undefined}
+                            />
+                          )
+                        },
+                      ) )}
                     </div>
                   ) : (
                     <p className="text-sm text-rose-100/60">
