@@ -52,40 +52,40 @@
 /* SignalForge is dark-only: the WebGL effects are tuned for a dark canvas. */
 :root {
   color-scheme: dark;
-  --background: oklch(0.14 0.012 255);
-  --foreground: oklch(0.96 0.006 255);
-  --card: oklch(0.18 0.014 255);
-  --card-foreground: oklch(0.96 0.006 255);
-  --popover: oklch(0.18 0.014 255);
-  --popover-foreground: oklch(0.96 0.006 255);
-  --primary: oklch(0.84 0.12 215);
-  --primary-foreground: oklch(0.16 0.02 255);
-  --secondary: oklch(0.24 0.014 255);
-  --secondary-foreground: oklch(0.96 0.006 255);
-  --muted: oklch(0.22 0.012 255);
-  --muted-foreground: oklch(0.74 0.014 255);
-  --accent: oklch(0.26 0.02 240);
-  --accent-foreground: oklch(0.96 0.006 255);
+  --background: oklch(0.045 0.012 330);
+  --foreground: oklch(0.96 0.008 350);
+  --card: oklch(0.09 0.012 330);
+  --card-foreground: oklch(0.96 0.008 350);
+  --popover: oklch(0.09 0.012 330);
+  --popover-foreground: oklch(0.96 0.008 350);
+  --primary: oklch(0.83 0.13 350);
+  --primary-foreground: oklch(0.14 0.02 350);
+  --secondary: oklch(0.15 0.014 330);
+  --secondary-foreground: oklch(0.96 0.008 350);
+  --muted: oklch(0.13 0.012 330);
+  --muted-foreground: oklch(0.7 0.025 350);
+  --accent: oklch(0.2 0.045 350);
+  --accent-foreground: oklch(0.96 0.008 350);
   --destructive: oklch(0.7 0.19 22);
   --warning: oklch(0.84 0.15 80);
   --warning-foreground: oklch(0.2 0.03 80);
   --border: oklch(1 0 0 / 11%);
   --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.84 0.12 215);
-  --chart-1: oklch(0.84 0.12 215);
-  --chart-2: oklch(0.84 0.15 80);
-  --chart-3: oklch(0.7 0.19 22);
-  --chart-4: oklch(0.6 0.02 255);
-  --chart-5: oklch(0.4 0.02 255);
+  --ring: oklch(0.83 0.13 350);
+  --chart-1: oklch(0.83 0.13 350);
+  --chart-2: oklch(0.76 0.12 15);
+  --chart-3: oklch(0.68 0.16 335);
+  --chart-4: oklch(0.52 0.035 350);
+  --chart-5: oklch(0.32 0.025 330);
   --radius: 0.625rem;
-  --sidebar: oklch(0.18 0.014 255);
-  --sidebar-foreground: oklch(0.96 0.006 255);
-  --sidebar-primary: oklch(0.84 0.12 215);
-  --sidebar-primary-foreground: oklch(0.16 0.02 255);
-  --sidebar-accent: oklch(0.24 0.014 255);
-  --sidebar-accent-foreground: oklch(0.96 0.006 255);
+  --sidebar: oklch(0.08 0.012 330);
+  --sidebar-foreground: oklch(0.96 0.008 350);
+  --sidebar-primary: oklch(0.83 0.13 350);
+  --sidebar-primary-foreground: oklch(0.14 0.02 350);
+  --sidebar-accent: oklch(0.15 0.014 330);
+  --sidebar-accent-foreground: oklch(0.96 0.008 350);
   --sidebar-border: oklch(1 0 0 / 11%);
-  --sidebar-ring: oklch(0.84 0.12 215);
+  --sidebar-ring: oklch(0.83 0.13 350);
 }
 
 @layer base {
@@ -94,5 +94,37 @@
   }
   body {
     @apply bg-background font-sans text-foreground;
+    min-height: 100dvh;
+    background-color: #050206;
+  }
+}
+
+
+html {
+  background: #050206;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100dvh;
+  background: #050206;
+}
+
+::selection {
+  color: #080308;
+  background: rgba(249, 168, 212, 0.88);
+}
+
+@keyframes sakura-scan {
+  0% { transform: translateX(-130%); }
+  100% { transform: translateX(260%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
   }
 }
