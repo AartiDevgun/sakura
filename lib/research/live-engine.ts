@@ -288,6 +288,17 @@ async function collectEvidence(
   })
 
   if (results.length === 0) {
+    // Preserve the budget-exhausted signal so a follow-up investigation can
+    // transparently fall back to the real sources already saved in its session.
+    const budgetError = rejected.find(
+      batch =>
+        batch.status === 'rejected' &&
+        batch.reason instanceof Error &&
+        /daily tavily limit reached/i.test(batch.reason.message),
+    )
+    if (budgetError?.status === 'rejected' && budgetError.reason instanceof Error) {
+      throw budgetError.reason
+    }
     throw new Error('No usable public sources were found. Try the full company name.')
   }
 
