@@ -173,18 +173,21 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
             <div
               role="img"
               aria-label="Interactive crystal sphere with an electric pink rim and glowing dust. Move the pointer over it to stir the light."
-              className="relative mt-1 h-52 w-52 sm:h-60 sm:w-60"
+              className="relative mt-1 shrink-0 overflow-hidden"
+              style={{ width: 'min(13rem, 68vw)', height: 'min(13rem, 68vw)' }}
             >
               <CrystalizedBall
                 preset="plasma"
                 color="#f472b6"
                 theme="dark"
-                size={0.82}
-                particleCount={9500}
+                size={0.7}
+                particleCount={7200}
                 speed={0.72}
+                motion="rise"
                 interactive
                 hoverStrength={0.78}
                 className="h-full w-full"
+                style={{ position: 'relative', width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%' }}
               />
             </div>
 
