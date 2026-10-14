@@ -1290,7 +1290,7 @@ const CrystalizedBall = ({
       const presence = easeOut(smooth(0, 0.42, introClock));
       const unfold = easeOut(smooth(0, 0.32, introClock));
       const charge = Math.sin(Math.PI * smooth(0.22, 0.78, introClock)) * 0.35;
-      const radius = Math.max(8, (clamp(s.size, 0.1, 1.5) * Math.min(width, height)) / 2);
+      const radius = Math.max(8, (clamp(s.size, 0.1, 5) * Math.min(width, height)) / 2);
 
       const strength = s.interactive && !reducedMotion ? clamp(s.hoverStrength, 0, 1) : 0;
       const px = pointer.x - width / 2;
@@ -1492,7 +1492,7 @@ const CrystalizedBall = ({
       pointer.x = spot.x;
       pointer.y = spot.y;
       pointer.inside = true;
-      const radius = Math.max(8, (clamp(s.size, 0.1, 1.5) * Math.min(width, height)) / 2);
+      const radius = Math.max(8, (clamp(s.size, 0.1, 5) * Math.min(width, height)) / 2);
       const kx = (spot.x - width / 2) / radius;
       const ky = (height / 2 - spot.y) / radius;
       const distance = Math.hypot(kx, ky);
