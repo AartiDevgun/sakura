@@ -135,12 +135,14 @@ export async function consumeDailyBudget(
   const key = `${PREFIX}:budget:${provider}:${day}`
 
   const script = `
+    local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+    local limit = tonumber(ARGV[1])
+    if current >= limit then
+      return {0, current}
+    end
     local count = redis.call('INCR', KEYS[1])
     if count == 1 then
       redis.call('EXPIRE', KEYS[1], 172800)
-    end
-    if count > tonumber(ARGV[1]) then
-      return {0, count}
     end
     return {1, count}
   `
