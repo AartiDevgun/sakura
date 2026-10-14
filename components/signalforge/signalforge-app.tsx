@@ -18,8 +18,9 @@ import { BrandLogo } from './brand-logo'
 import { CompanyPrompt } from './company-prompt'
 import { RequestError } from './request-error'
 import { ResearchTunnel } from './research-tunnel'
-import { EvidenceFlipCard } from './evidence-flip-card'
 import { PeekRating } from './peek-rating'
+import { JellyRadio } from './jelly-radio'
+import { CounterargumentExplorer } from './counterargument-explorer'
 import DitherVeil from './dither-veil'
 
 const INTRO_HOLD_MS = 2200
@@ -222,7 +223,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
               </p>
               <div className="relative mt-4 h-52 overflow-hidden rounded-2xl border border-pink-200/15 bg-zinc-950 sm:h-64">
                 <DitherVeil
-                  src="https://images.unsplash.com/photo-1522383225653-ed111181a951?q=85&w=1600&auto=format&fit=crop"
+                  src="https://images.unsplash.com/photo-1478436127897-769e1b3f0f36?q=85&w=1800&auto=format&fit=crop"
                   className="absolute inset-0"
                   style={{ width: '100%', height: '100%' }}
                   fit="cover"
@@ -293,45 +294,11 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid gap-3">
-                    {flow.research.angles.map((angle, index) => (
-                      <motion.button
-                        type="button"
-                        whileTap={{ scale: 0.975, borderRadius: 28 }}
-                        transition={{ type: 'spring', stiffness: 420, damping: 19 }}
-                        key={angle.id}
-                        onClick={() =>
-                          runInvestigation(flow.research, angle.id)
-                        }
-                        className="group w-full rounded-2xl border border-pink-200/15 bg-gradient-to-br from-pink-950/35 to-black/70 p-5 text-left transition-all duration-300 hover:border-pink-300/60 hover:shadow-[0_0_30px_rgba(236,72,153,0.09)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
-                      >
-                        <div className="flex items-start gap-4">
-                          <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-pink-300/25 text-sm text-pink-200">
-                            {String(index + 1).padStart(2, '0')}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-1 text-xs uppercase tracking-[0.16em] text-pink-300/80">
-                              {angle.label}
-                            </div>
-                            <h3 className="font-semibold leading-6 text-pink-50 transition-colors group-hover:text-pink-200">
-                              {angle.title}
-                            </h3>
-                            <p className="mt-2 text-sm leading-6 text-rose-100/60">
-                              {angle.rationale}
-                            </p>
-                            {angle.signalStrength ? (
-                              <p className="mt-3 text-xs text-pink-200/70">
-                                Initial signal: {angle.signalStrength}
-                              </p>
-                            ) : null}
-                          </div>
-                          <span className="text-lg text-pink-300 transition-transform group-hover:translate-x-1">
-                            ↗
-                          </span>
-                        </div>
-                      </motion.button>
-                    ))}
-                  </div>
+                  <JellyRadio
+                    angles={flow.research.angles}
+                    company={flow.research.company}
+                    onSelect={angleId => runInvestigation(flow.research, angleId)}
+                  />
                 )}
 
                 {flow.step === 'investigation-error' ? (
@@ -444,31 +411,10 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                 ) : null}
 
                 <ReportSection title="Counterarguments">
-                  {flow.investigation.report.counterarguments.length ? (
-                    <div className="space-y-4">
-                      {flow.investigation.report.counterarguments.map(
-                        (item, index) => {
-                          const source = flow.investigation.report.sources.find(
-                            candidate => candidate.id === item.sourceId,
-                          )
-                          return (
-                            <EvidenceFlipCard
-                              key={`${item.argument}-${index}`}
-                              argument={item.argument}
-                              assessment={item.assessment}
-                              sourceUrl={source?.url}
-                              sourceLabel={source ? `Source: ${source.publisher || source.title}` : undefined}
-                            />
-                          )
-                        },
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-rose-100/60">
-                      No counterarguments were returned. Treat the conclusion as
-                      incomplete until alternatives are assessed.
-                    </p>
-                  )}
+                  <CounterargumentExplorer
+                    items={flow.investigation.report.counterarguments}
+                    sources={flow.investigation.report.sources}
+                  />
                 </ReportSection>
 
                 <ReportSection title="What would change this conclusion?">
