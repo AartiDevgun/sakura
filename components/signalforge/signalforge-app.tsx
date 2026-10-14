@@ -443,7 +443,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                             />
                           )
                         },
-                      ) )}
+                      )}
                     </div>
                   ) : (
                     <p className="text-sm text-rose-100/60">
