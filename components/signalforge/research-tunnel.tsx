@@ -1,8 +1,6 @@
-
 'use client'
 
 import LightTunnel from '@/components/LightTunnel'
-
 
 export function ResearchTunnel() {
   return (
@@ -43,7 +41,6 @@ export function ResearchTunnel() {
         dpr={1.5}
       />
 
-      {/* Keep the edges cinematic and black */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/60" />
 
       <div
