@@ -16,6 +16,7 @@ import { AppHeader } from './app-header'
 import { BrandLogo } from './brand-logo'
 import { CompanyPrompt } from './company-prompt'
 import { RequestError } from './request-error'
+import { ResearchTunnel } from './research-tunnel'
 import { JellyRadio } from './jelly-radio'
 import { ReportDashboard } from './report-dashboard'
 
@@ -33,7 +34,7 @@ type Flow =
   | { step: 'result'; research: ResearchResponse; investigation: InvestigationResponse }
 
 export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
-  const [intro, setIntro] = useState<IntroPhase>('done')
+  const [intro, setIntro] = useState<IntroPhase>('intro')
   const [flow, setFlow] = useState<Flow>({ step: 'idle' })
   const [mockScenario, setMockScenario] = useState<MockScenario>('default')
   const [followupBusy, setFollowupBusy] = useState(false)
@@ -129,6 +130,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
   return (
     <>
       {!busy ? <SakuraParticles /> : null}
+      {busy ? <ResearchTunnel /> : null}
 
       {!busy ? (
         <>
@@ -155,91 +157,47 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
         inert={!ready || busy}
         aria-busy={busy}
         className={cn(
-          'relative z-10 mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-4 pb-24 transition-opacity duration-500 motion-reduce:transition-none sm:px-6',
+          'relative z-10 mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-4 pb-72 transition-opacity duration-500 motion-reduce:transition-none sm:px-6',
           homeScreen ? 'justify-center pt-20' : 'gap-8 pt-24',
           ready && !busy ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
       >
         {homeScreen ? (
-          <section className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-12 py-6 text-left md:grid-cols-[minmax(0,1.2fr)_minmax(250px,0.8fr)] md:gap-20 md:py-12">
-            <div className="flex min-w-0 flex-col items-start">
-              <p className="flex items-center gap-3 text-[10px] font-medium uppercase tracking-[0.22em] text-pink-200/70">
-                <span className="h-px w-8 bg-pink-300/70" />
-                SAKURA / Financial research desk
-              </p>
-
-              <h1 className="mt-7 max-w-2xl text-balance font-serif text-5xl font-medium leading-[1.02] tracking-[-0.045em] text-stone-100 sm:text-6xl md:text-7xl">
-                Don&apos;t stop at the result.
-                <span className="mt-2 block font-normal italic text-pink-200">Trace what made it happen.</span>
-              </h1>
-
-              <p className="mt-6 max-w-xl text-pretty text-sm leading-7 text-stone-300/70 sm:text-base sm:leading-8">
-                A closer read of India&apos;s public companies. SAKURA follows changes through filings, results and industry data, then checks whether the evidence really supports the story.
-              </p>
-
-              <div className="mt-7 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-white/[0.12] py-3 text-[9px] font-medium uppercase tracking-[0.15em] text-stone-400/75 sm:text-[10px]">
-                <span>NIFTY 50</span>
-                <span aria-hidden="true" className="text-pink-300/60">/</span>
-                <span>Public records</span>
-                <span aria-hidden="true" className="text-pink-300/60">/</span>
-                <span>Source-linked claims</span>
-              </div>
-
-              <div className="mt-8 w-full max-w-xl">
-                <CompanyPrompt
-                  key={lastCompany}
-                  backendMode={backendMode}
-                  busy={false}
-                  defaultCompany={lastCompany}
-                  mockScenario={mockScenario}
-                  onMockScenarioChange={setMockScenario}
-                  onSubmit={runResearch}
-                />
-              </div>
-
-              <p className="mt-4 text-[11px] leading-5 text-stone-500">
-                Research, not a stock tip. Every conclusion should be traceable to a public source.
-              </p>
-
-              {flow.step === 'research-error' ? (
-                <div className="mt-6 w-full max-w-xl">
-                  <RequestError title="Research could not be completed" message={flow.message} onRetry={() => runResearch(flow.company)} />
-                </div>
-              ) : null}
+          <div className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-pink-200/20 bg-black/50 px-3.5 py-2 text-[10px] font-semibold uppercase tracking-[0.21em] text-pink-200/85 shadow-[0_0_32px_rgba(236,72,153,0.06)] backdrop-blur">
+              <span className="size-1.5 rounded-full bg-pink-300 shadow-[0_0_10px_rgba(244,114,182,0.85)]" />
+              Autonomous financial research
             </div>
 
-            <aside className="mt-2 border-t border-pink-200/25 pt-5 md:mt-24">
-              <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-stone-500">How we work <span className="ml-2 text-pink-200/65">01—03</span></p>
+            <h1 className="mt-7 max-w-4xl text-balance font-serif text-4xl font-bold leading-[1.06] tracking-[-0.045em] text-rose-50 sm:text-6xl md:text-7xl">
+              The most important signal
+              <span className="mt-1 block italic text-pink-200">is often hiding in plain sight.</span>
+            </h1>
 
-              <div className="mt-3">
-                <div className="grid grid-cols-[2.25rem_1fr] gap-3 border-b border-white/[0.11] py-5">
-                  <span className="pt-0.5 font-mono text-xs text-pink-200/65">01</span>
-                  <div>
-                    <h2 className="text-sm font-medium text-stone-100">Find the question</h2>
-                    <p className="mt-1.5 text-xs leading-5 text-stone-400">Spot a change that deserves more than a headline.</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-[2.25rem_1fr] gap-3 border-b border-white/[0.11] py-5">
-                  <span className="pt-0.5 font-mono text-xs text-pink-200/65">02</span>
-                  <div>
-                    <h2 className="text-sm font-medium text-stone-100">Follow the record</h2>
-                    <p className="mt-1.5 text-xs leading-5 text-stone-400">Compare periods, disclosures and independent sources.</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-[2.25rem_1fr] gap-3 border-b border-white/[0.11] py-5">
-                  <span className="pt-0.5 font-mono text-xs text-pink-200/65">03</span>
-                  <div>
-                    <h2 className="text-sm font-medium text-stone-100">Try to disprove it</h2>
-                    <p className="mt-1.5 text-xs leading-5 text-stone-400">Keep alternatives visible and state what would change the conclusion.</p>
-                  </div>
-                </div>
+            <p className="mt-6 max-w-2xl text-pretty text-sm leading-7 text-rose-100/58 sm:text-base sm:leading-8">
+              SAKURA follows the evidence across filings, results, industry data and competitors—then challenges its own explanation before calling it a discovery.
+            </p>
+
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+              <span className="rounded-full border border-pink-200/20 bg-pink-200/[0.06] px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-pink-100/85">Track A · Financial services</span>
+              <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-[9px] uppercase tracking-[0.15em] text-rose-100/45">Evidence before opinion</span>
+              <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-[9px] uppercase tracking-[0.15em] text-rose-100/45">Public sources only</span>
+            </div>
+
+            <div className="mt-12 grid w-full max-w-3xl gap-3 text-left sm:grid-cols-3">
+              <HomeStep number="01" title="Discover" copy="Generate competing questions from public evidence." />
+              <HomeStep number="02" title="Challenge" copy="Compare explanations, metrics and time periods." />
+              <HomeStep number="03" title="Prove" copy="Trace claims to sources and define what could disprove them." />
+            </div>
+
+            {flow.step === 'research-error' ? (
+              <div className="mt-6 w-full max-w-2xl text-left">
+                <RequestError title="Research could not be completed" message={flow.message} onRetry={() => runResearch(flow.company)} />
               </div>
+            ) : null}
 
-              <p className="mt-5 max-w-xs text-xs leading-6 text-stone-500">
-                No black-box score. No claim without a trail back to its source.
-              </p>
-            </aside>
-          </section>
+            <p className="mt-8 text-[9px] uppercase tracking-[0.24em] text-rose-100/30">Search a company to begin the investigation</p>
+          </div>
         ) : null}
 
         {flow.step === 'angles' || flow.step === 'investigation-error' ? (
@@ -271,7 +229,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
         ) : null}
       </main>
 
-      {ready && !busy && flow.step !== 'result' && !homeScreen ? (
+      {ready && !busy && flow.step !== 'result' ? (
         <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.8rem,env(safe-area-inset-bottom))] pt-8 sm:px-5">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-t from-black via-black/95 to-black/0" />
           <div className="mx-auto w-full max-w-4xl">
@@ -289,19 +247,21 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
       ) : null}
 
       {busy ? (
-        <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center bg-[#080708]/95 px-6 text-left">
-          <div className="w-full max-w-lg border-t border-pink-200/30 pt-5">
-            <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-stone-500">
-              Research in progress <span className="mx-2 text-pink-200/60">/</span> {activeCompany}
-            </p>
-            <h1 className="mt-5 font-serif text-3xl font-medium leading-tight text-stone-100 sm:text-4xl">
-              {followupBusy ? 'Checking another explanation.' : flow.step === 'researching' ? 'Reading the public record.' : 'Testing the hypothesis.'}
+        <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center px-6 text-center">
+          <div className="max-w-2xl">
+            <p className="text-[10px] font-medium uppercase tracking-[0.42em] text-pink-300/80">SAKURA intelligence</p>
+            <h1 className="mt-5 text-4xl font-light tracking-wide text-rose-50 sm:text-6xl">
+              {followupBusy ? 'Following the evidence' : 'Thinking'}<span className="animate-pulse text-pink-400">...</span>
             </h1>
-            <p className="mt-4 max-w-md text-sm leading-7 text-stone-400">
-              Comparing source passages and dates before presenting a finding. This can take a moment.
+            <p className="mt-5 text-sm leading-6 text-pink-100/60">
+              {followupBusy
+                ? 'Searching for fresh support and alternative explanations for ' + activeCompany + '.'
+                : flow.step === 'researching'
+                  ? 'Exploring public evidence for ' + activeCompany + '.'
+                  : 'Examining evidence and challenging the hypothesis for ' + activeCompany + '.'}
             </p>
-            <div className="mt-8 h-px w-full bg-white/[0.12]">
-              <div className="h-full w-1/3 animate-[sakura-scan_2.4s_ease-in-out_infinite] bg-pink-200/60" />
+            <div className="mx-auto mt-8 h-px w-36 overflow-hidden bg-pink-100/10">
+              <div className="h-full w-1/2 animate-[sakura-scan_1.8s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-pink-300 to-transparent" />
             </div>
           </div>
         </div>
@@ -310,3 +270,12 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
   )
 }
 
+function HomeStep({ number, title, copy }: { number: string; title: string; copy: string }) {
+  return (
+    <div className="rounded-2xl border border-pink-200/10 bg-black/40 p-4 backdrop-blur-sm sm:p-5">
+      <p className="text-[10px] font-mono tracking-[0.18em] text-pink-300/65">{number}</p>
+      <h2 className="mt-3 text-sm font-semibold text-rose-50">{title}</h2>
+      <p className="mt-1.5 text-xs leading-5 text-rose-100/45">{copy}</p>
+    </div>
+  )
+}
