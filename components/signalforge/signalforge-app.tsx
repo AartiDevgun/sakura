@@ -204,7 +204,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
           ready && !busy ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
       >
-        {!busy ? (
+        {!busy && (
           <>
             <div className="flex flex-col gap-2">
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-300">
