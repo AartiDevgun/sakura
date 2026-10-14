@@ -7,7 +7,9 @@ import {
   type BackendMode,
   type MockScenario,
   type ResearchResponse,
+  type InvestigationResponse,
   researchResponseSchema,
+  investigationResponseSchema,
 } from '@/lib/research/schema'
 import { cn } from '@/lib/utils'
 import { AppHeader } from './app-header'
@@ -15,6 +17,7 @@ import { BrandLogo } from './brand-logo'
 import { CompanyPrompt } from './company-prompt'
 import { RequestError } from './request-error'
 import { ResearchProgress } from './research-progress'
+import { ResearchTunnel } from './research-tunnel'
 
 const INTRO_HOLD_MS = 2200
 
@@ -25,6 +28,18 @@ type Flow =
   | { step: 'researching'; company: string }
   | { step: 'research-error'; company: string; message: string }
   | { step: 'angles'; research: ResearchResponse }
+  | { step: 'investigating'; research: ResearchResponse; angleId: string }
+  | {
+      step: 'investigation-error'
+      research: ResearchResponse
+      angleId: string
+      message: string
+    }
+  | {
+      step: 'result'
+      research: ResearchResponse
+      investigation: InvestigationResponse
+    }
 
 export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
   const reduce = useReducedMotion()
@@ -35,14 +50,18 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
 
   useEffect(() => {
     if (intro !== 'intro') return
+
     if (reduce) {
       setIntro('done')
       return
     }
+
     const skip = () => setIntro('docking')
     const timer = setTimeout(skip, INTRO_HOLD_MS)
+
     window.addEventListener('keydown', skip, { once: true })
     window.addEventListener('pointerdown', skip, { once: true })
+
     return () => {
       clearTimeout(timer)
       window.removeEventListener('keydown', skip)
@@ -67,12 +86,56 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
   const runResearch = async (company: string) => {
     const signal = startRequest()
     setFlow({ step: 'researching', company })
+
     try {
-      const research = await postJson('/api/research', { company }, researchResponseSchema, { signal, mockScenario })
+      const research = await postJson(
+        '/api/research',
+        { company },
+        researchResponseSchema,
+        { signal, mockScenario },
+      )
+
       setFlow({ step: 'angles', research })
     } catch (error) {
       if (isAbortError(error)) return
-      setFlow({ step: 'research-error', company, message: (error as Error).message })
+
+      setFlow({
+        step: 'research-error',
+        company,
+        message: (error as Error).message,
+      })
+    }
+  }
+
+  const runInvestigation = async (
+    research: ResearchResponse,
+    angleId: string,
+  ) => {
+    const signal = startRequest()
+    setFlow({ step: 'investigating', research, angleId })
+
+    try {
+      const investigation = await postJson(
+        '/api/research/investigate',
+        {
+          researchId: research.researchId,
+          company: research.company,
+          angleId,
+        },
+        investigationResponseSchema,
+        { signal, mockScenario },
+      )
+
+      setFlow({ step: 'result', research, investigation })
+    } catch (error) {
+      if (isAbortError(error)) return
+
+      setFlow({
+        step: 'investigation-error',
+        research,
+        angleId,
+        message: (error as Error).message,
+      })
     }
   }
 
@@ -83,72 +146,320 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
 
   const docked = intro !== 'intro'
   const ready = intro === 'done'
-  const busy = flow.step === 'researching'
-  const lastCompany = flow.step === 'idle' ? '' : flow.step === 'angles' ? flow.research.company : flow.company
+  const busy = flow.step === 'researching' || flow.step === 'investigating'
+
+  const lastCompany =
+    flow.step === 'idle'
+      ? ''
+      : flow.step === 'researching' || flow.step === 'research-error'
+        ? flow.company
+        : flow.research.company
+
+  const activeAngle =
+    flow.step === 'investigating' || flow.step === 'investigation-error'
+      ? flow.research.angles.find(angle => angle.id === flow.angleId)
+      : undefined
 
   return (
     <>
-      <BrandLogo docked={docked} electrified={!ready || busy} onDocked={() => setIntro('done')} />
+      {busy ? <ResearchTunnel /> : null}
+
+      <BrandLogo
+        docked={docked}
+        electrified={!ready || busy}
+        onDocked={() => setIntro('done')}
+      />
 
       <div
         aria-hidden="true"
         className={cn(
-          'pointer-events-none fixed inset-x-0 top-[calc(50%+72px)] z-50 text-center font-mono text-2xl font-bold tracking-tight transition-opacity duration-500 motion-reduce:transition-none',
+          'pointer-events-none fixed inset-x-0 top-[calc(50%+72px)] z-50 text-center font-mono text-2xl font-bold tracking-[0.25em] text-pink-100 transition-opacity duration-500 motion-reduce:transition-none',
           docked ? 'opacity-0' : 'opacity-100',
         )}
       >
-      SAKURA
+        SAKURA
       </div>
 
-      <AppHeader visible={docked} backendMode={backendMode} onReset={flow.step === 'idle' ? undefined : reset} />
+      <AppHeader
+        visible={docked && !busy}
+        backendMode={backendMode}
+        onReset={flow.step === 'idle' || busy ? undefined : reset}
+      />
 
       <main
         inert={!ready}
+        aria-busy={busy}
         className={cn(
-          'mx-auto flex min-h-dvh w-full max-w-3xl flex-col gap-8 px-4 pt-24 pb-16 transition-opacity duration-500 motion-reduce:transition-none',
+          'relative z-10 flex min-h-dvh w-full transition-opacity duration-500 motion-reduce:transition-none',
+          busy
+            ? 'items-center justify-center px-5 py-16 text-center'
+            : 'mx-auto max-w-3xl flex-col gap-8 px-4 pt-24 pb-16',
           ready ? 'opacity-100' : 'opacity-0',
         )}
       >
-        <div className="flex flex-col gap-2">
-          <h1 className="text-pretty text-3xl font-semibold tracking-tight sm:text-4xl">Research a company</h1>
-          <p className="text-pretty text-muted-foreground">
-            Find research angles, investigate one, and review the evidence behind the discovery.
-          </p>
-        </div>
+        {busy ? (
+          <div className="w-full max-w-xl">
+            <div className="mb-8">
+              <div className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-pink-300">
+                SAKURA intelligence
+              </div>
+              <h1 className="text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                {flow.step === 'researching'
+                  ? 'Following the evidence.'
+                  : 'Challenging the hypothesis.'}
+              </h1>
+              <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-pink-100/65">
+                {flow.step === 'researching'
+                  ? `Discovering research angles for ${flow.company}.`
+                  : `Investigating ${activeAngle?.title ?? 'the selected research angle'} for ${flow.research.company}.`}
+              </p>
+            </div>
 
-        <CompanyPrompt
-          key={lastCompany}
-          backendMode={backendMode}
-          busy={busy}
-          defaultCompany={lastCompany}
-          mockScenario={mockScenario}
-          onMockScenarioChange={setMockScenario}
-          onSubmit={runResearch}
-        />
+            <div className="mx-auto w-full max-w-md rounded-2xl border border-pink-300/20 bg-black/55 p-5 text-left shadow-[0_0_60px_rgba(236,72,153,0.12)] backdrop-blur-md">
+              <ResearchProgress
+                label={
+                  flow.step === 'researching'
+                    ? `Researching ${flow.company}`
+                    : `Investigating ${activeAngle?.label ?? 'selected angle'}`
+                }
+                detail={
+                  flow.step === 'researching'
+                    ? 'Collecting public sources and forming candidate research angles.'
+                    : 'Reviewing source passages, calculations and alternative explanations.'
+                }
+                onCancel={reset}
+              />
+            </div>
 
-        {flow.step === 'researching' ? (
-          <ResearchProgress
-            label={`Researching ${flow.company}`}
-            detail="Waiting for the research backend to return candidate angles."
-            onCancel={reset}
-          />
-        ) : null}
+            <p className="mt-5 text-xs tracking-wide text-pink-100/40">
+              Searching · Comparing · Challenging
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-300">
+                Independent financial research
+              </p>
+              <h1 className="text-pretty text-3xl font-semibold tracking-tight text-pink-50 sm:text-4xl">
+                Look beyond the obvious.
+              </h1>
+              <p className="max-w-2xl text-pretty leading-7 text-rose-100/60">
+                Investigate public evidence, uncover unusual patterns, and challenge
+                the explanations behind them.
+              </p>
+            </div>
 
-        {flow.step === 'research-error' ? (
-          <RequestError
-            title="Research failed"
-            message={flow.message}
-            onRetry={() => runResearch(flow.company)}
-          />
-        ) : null}
+            <CompanyPrompt
+              key={lastCompany}
+              backendMode={backendMode}
+              busy={false}
+              defaultCompany={lastCompany}
+              mockScenario={mockScenario}
+              onMockScenarioChange={setMockScenario}
+              onSubmit={runResearch}
+            />
 
-        {flow.step === 'angles' ? (
-          <section aria-labelledby="angles-heading">
-            <h2 id="angles-heading" ref={el => el?.focus()} tabIndex={-1} className="text-xl font-semibold outline-none">
-              {flow.research.angles.length} research angles for {flow.research.company}
-            </h2>
-          </section>
-        ) : null}
+            {flow.step === 'research-error' ? (
+              <RequestError
+                title="Research failed"
+                message={flow.message}
+                onRetry={() => runResearch(flow.company)}
+              />
+            ) : null}
+
+            {flow.step === 'angles' || flow.step === 'investigation-error' ? (
+              <section aria-labelledby="angles-heading" className="space-y-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-300">
+                    Choose your direction
+                  </p>
+                  <h2
+                    id="angles-heading"
+                    tabIndex={-1}
+                    className="mt-2 text-xl font-semibold text-pink-50 outline-none sm:text-2xl"
+                  >
+                    {flow.research.angles.length} research angles for{' '}
+                    {flow.research.company}
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-rose-100/55">
+                    Choose one angle to investigate its supporting evidence,
+                    counterarguments and potential risks.
+                  </p>
+                </div>
+
+                {flow.research.angles.length === 0 ? (
+                  <div className="rounded-xl border border-pink-200/15 bg-white/[0.03] p-5 text-sm text-rose-100/70">
+                    No research angles were returned. Try another company or retry
+                    the request.
+                    <button
+                      type="button"
+                      onClick={() => runResearch(flow.research.company)}
+                      className="ml-2 text-pink-300 underline underline-offset-4"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {flow.research.angles.map((angle, index) => (
+                      <button
+                        type="button"
+                        key={angle.id}
+                        onClick={() =>
+                          runInvestigation(flow.research, angle.id)
+                        }
+                        className="group w-full rounded-2xl border border-pink-200/15 bg-gradient-to-br from-pink-950/35 to-black/70 p-5 text-left transition-all duration-300 hover:border-pink-300/60 hover:bg-pink-950/30 hover:shadow-[0_0_30px_rgba(236,72,153,0.09)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
+                      >
+                        <div className="flex items-start gap-4">
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-pink-300/25 text-sm text-pink-200">
+                            0{index + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1 text-xs uppercase tracking-[0.16em] text-pink-300/80">
+                              {angle.label}
+                            </div>
+                            <h3 className="font-semibold leading-6 text-pink-50 transition-colors group-hover:text-pink-200">
+                              {angle.title}
+                            </h3>
+                            <p className="mt-2 text-sm leading-6 text-rose-100/60">
+                              {angle.rationale}
+                            </p>
+                            {angle.signalStrength ? (
+                              <p className="mt-3 text-xs text-pink-200/70">
+                                Initial signal: {angle.signalStrength}
+                              </p>
+                            ) : null}
+                          </div>
+                          <span className="text-lg text-pink-300 transition-transform group-hover:translate-x-1">
+                            ↗
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {flow.step === 'investigation-error' ? (
+                  <RequestError
+                    title="Investigation failed"
+                    message={flow.message}
+                    onRetry={() =>
+                      runInvestigation(flow.research, flow.angleId)
+                    }
+                  />
+                ) : null}
+              </section>
+            ) : null}
+
+            {flow.step === 'result' ? (
+              <section className="space-y-5" aria-labelledby="discovery-heading">
+                <div className="rounded-2xl border border-pink-300/25 bg-gradient-to-br from-pink-950/45 via-black to-black p-6 shadow-[0_0_45px_rgba(236,72,153,0.08)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-pink-300">
+                    Research discovery · {flow.investigation.discovery.confidence} confidence
+                  </p>
+                  <h2
+                    id="discovery-heading"
+                    className="mt-3 text-2xl font-semibold leading-tight text-pink-50 sm:text-3xl"
+                  >
+                    {flow.investigation.discovery.headline}
+                  </h2>
+                  <p className="mt-4 leading-7 text-rose-100/75">
+                    {flow.investigation.discovery.summary}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-pink-200/15 bg-white/[0.025] p-5">
+                  <h3 className="font-semibold text-pink-100">What the evidence supports</h3>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-rose-100/65">
+                    {flow.investigation.report.thesis}
+                  </p>
+                </div>
+
+                {flow.investigation.report.calculations.length > 0 ? (
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-pink-100">Calculations</h3>
+                    {flow.investigation.report.calculations.map((calc, index) => (
+                      <div key={`${calc.label}-${index}`} className="rounded-xl border border-pink-200/15 p-4">
+                        <p className="font-medium text-pink-50">{calc.label}</p>
+                        <p className="mt-2 text-sm text-pink-200">{calc.result}</p>
+                        <p className="mt-1 text-xs text-rose-100/50">{calc.formula}</p>
+                        <p className="mt-2 text-sm leading-6 text-rose-100/65">{calc.interpretation}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {flow.investigation.report.timeline.length > 0 ? (
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-pink-100">Timeline</h3>
+                    {flow.investigation.report.timeline.map((event, index) => (
+                      <div key={`${event.date}-${index}`} className="border-l border-pink-300/35 pl-4 py-1">
+                        <p className="text-xs text-pink-300">{event.date}</p>
+                        <p className="mt-1 text-sm leading-6 text-rose-100/75">{event.event}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="rounded-2xl border border-pink-200/15 p-5">
+                  <h3 className="font-semibold text-pink-100">Counterarguments</h3>
+                  {flow.investigation.report.counterarguments.length ? (
+                    <div className="mt-3 space-y-4">
+                      {flow.investigation.report.counterarguments.map((item, index) => (
+                        <div key={`${item.argument}-${index}`}>
+                          <p className="text-sm font-medium text-pink-50">{item.argument}</p>
+                          <p className="mt-1 text-sm leading-6 text-rose-100/60">{item.assessment}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-rose-100/60">No counterarguments were returned. Treat the conclusion as incomplete until alternatives are assessed.</p>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-pink-300/25 bg-pink-950/20 p-5">
+                  <h3 className="font-semibold text-pink-100">What would change this conclusion?</h3>
+                  <p className="mt-2 text-sm leading-6 text-rose-100/70">
+                    {flow.investigation.report.falsification.condition}
+                  </p>
+                  {flow.investigation.report.falsification.metric ? (
+                    <p className="mt-2 text-xs text-pink-200/70">
+                      Monitor: {flow.investigation.report.falsification.metric}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-pink-100">Evidence sources</h3>
+                  {flow.investigation.report.sources.map(source => (
+                    <a
+                      key={source.id}
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-xl border border-pink-200/15 p-4 transition-colors hover:border-pink-300/50"
+                    >
+                      <p className="font-medium text-pink-100">{source.title}</p>
+                      <p className="mt-1 break-all text-xs text-pink-300/70">{source.publisher || source.url}</p>
+                      {source.publishedAt ? (
+                        <p className="mt-1 text-xs text-rose-100/45">Published: {source.publishedAt}</p>
+                      ) : null}
+                    </a>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setFlow({ step: 'angles', research: flow.research })}
+                  className="text-sm text-pink-300 underline underline-offset-4 hover:text-pink-100"
+                >
+                  Explore another research angle
+                </button>
+              </section>
+            ) : null}
+          </>
+        )}
       </main>
     </>
   )
