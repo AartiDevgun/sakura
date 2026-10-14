@@ -21,7 +21,11 @@ export async function POST(request: Request) {
   try {
     let result
 
-    if (process.env.SIGNALFORGE_API_URL) {
+    // Prefer the configured local Tavily + Groq engine. This keeps the
+    // research session and follow-up investigation on the same backend.
+    if (process.env.TAVILY_API_KEY && process.env.GROQ_API_KEY) {
+      result = await liveResearch(body.data.company, request.signal)
+    } else if (process.env.SIGNALFORGE_API_URL) {
       result = await callBackend(
         '/research',
         body.data,
@@ -29,7 +33,7 @@ export async function POST(request: Request) {
         request.signal,
       )
     } else if (getBackendMode() === 'live') {
-      result = await liveResearch(body.data.company, request.signal)
+      throw new Error('Live research is selected, but no research provider is configured.')
     } else {
       result = await mockResearch(
         body.data.company,
