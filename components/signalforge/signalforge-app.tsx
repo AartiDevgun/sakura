@@ -367,6 +367,26 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                         <p className="mt-2 text-sm leading-6 text-rose-100/65">
                           {calc.interpretation}
                         </p>
+                        {calc.inputs.some(input => input.sourceId) ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {calc.inputs.map((input, inputIndex) => {
+                              const source = flow.investigation.report.sources.find(
+                                item => item.id === input.sourceId,
+                              )
+                              return source ? (
+                                <a
+                                  key={`${input.sourceId}-${inputIndex}`}
+                                  href={source.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-pink-300 underline decoration-pink-300/30 underline-offset-4 hover:text-pink-100"
+                                >
+                                  {input.name}: source ↗
+                                </a>
+                              ) : null
+                            })}
+                          </div>
+                        ) : null}
                       </div>
                     ))}
                   </section>
@@ -384,6 +404,21 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                         <p className="mt-1 text-sm leading-6 text-rose-100/75">
                           {event.event}
                         </p>
+                        {event.sourceId ? (() => {
+                          const source = flow.investigation.report.sources.find(
+                            item => item.id === event.sourceId,
+                          )
+                          return source ? (
+                            <a
+                              href={source.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-1 inline-block text-xs text-pink-300 underline decoration-pink-300/30 underline-offset-4"
+                            >
+                              Source: {source.publisher || source.title} ↗
+                            </a>
+                          ) : null
+                        })() : null}
                       </div>
                     ))}
                   </section>
@@ -401,6 +436,21 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                             <p className="mt-1 text-sm leading-6 text-rose-100/60">
                               {item.assessment}
                             </p>
+                            {item.sourceId ? (() => {
+                              const source = flow.investigation.report.sources.find(
+                                candidate => candidate.id === item.sourceId,
+                              )
+                              return source ? (
+                                <a
+                                  href={source.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-1 inline-block text-xs text-pink-300 underline decoration-pink-300/30 underline-offset-4"
+                                >
+                                  Source: {source.publisher || source.title} ↗
+                                </a>
+                              ) : null
+                            })() : null}
                           </div>
                         ),
                       )}
@@ -438,6 +488,18 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                       <p className="mt-1 break-all text-xs text-pink-300/70">
                         {source.publisher || source.url}
                       </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.12em]">
+                        {source.sourceTier ? (
+                          <span className="rounded-full border border-pink-200/20 px-2 py-1 text-rose-100/70">
+                            {source.sourceTier} source
+                          </span>
+                        ) : null}
+                        {source.sourceType ? (
+                          <span className="rounded-full border border-pink-200/10 px-2 py-1 text-rose-100/50">
+                            {source.sourceType.replace(/_/g, ' ')}
+                          </span>
+                        ) : null}
+                      </div>
                       {source.publishedAt ? (
                         <p className="mt-1 text-xs text-rose-100/45">
                           Published: {source.publishedAt}
