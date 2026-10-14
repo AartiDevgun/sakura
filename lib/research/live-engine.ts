@@ -191,16 +191,15 @@ async function collectEvidence(
   angle?: string,
   signal?: AbortSignal,
 ): Promise<Evidence[]> {
+  // Keep each phase to two focused searches so the daily Tavily budget
+  // supports more complete research sessions without sacrificing source breadth.
   const queries = angle
     ? [
         `"${company}" ${angle} annual report financial results`,
-        `${company} ${angle} investor presentation exchange filing`,
-        `${company} ${angle} competitor industry trend`,
-        `site:nseindia.com "${company}" ${angle}`,
+        `${company} ${angle} investor presentation exchange filing competitor industry trend`,
       ]
     : [
         `${company} annual report latest quarterly financial results investor presentation`,
-        `site:nseindia.com "${company}" financial results announcements`,
         `${company} margins working capital revenue segments competitors industry trends`,
       ]
 
@@ -599,7 +598,24 @@ export async function liveInvestigation(
     .split('\n\nSources to examine:')[0]
     .trim()
   const angleQuery = [angleTitle, angleRationale].filter(Boolean).join(' ')
-  const freshEvidence = await collectEvidence(company, angleQuery, signal)
+  let freshEvidence: Evidence[] = []
+  let freshSearchUnavailable = false
+  try {
+    freshEvidence = await collectEvidence(company, angleQuery, signal)
+  } catch (error) {
+    // If the daily search budget is spent, the initial session still contains
+    // real sources. Continue transparently with those sources rather than
+    // making the angle unusable or inventing replacement evidence.
+    if (
+      session &&
+      error instanceof Error &&
+      /daily tavily limit reached/i.test(error.message)
+    ) {
+      freshSearchUnavailable = true
+    } else {
+      throw error
+    }
+  }
   const sources = session ? mergeEvidence(session.evidence, freshEvidence) : freshEvidence
 
   const result = await askForJson(
@@ -608,6 +624,9 @@ export async function liveInvestigation(
 
 Selected angle: ${angleTitle}
 Original rationale: ${angleRationale || 'No original rationale is available.'}
+Fresh angle-specific web search: ${freshSearchUnavailable
+      ? 'UNAVAILABLE: the daily Tavily budget has been exhausted. Use only the supplied session sources and explicitly state that fresh corroboration was not possible.'
+      : 'Attempted; use only the source excerpts below and be clear if coverage is thin.'}
 
 Do not assume the hypothesis is true. Assess whether the evidence supports it, contradicts it, or is insufficient. Distinguish confirmed facts, plausible explanations, and unknowns. Explicitly mention if some searches may have failed or evidence is too thin.
 
