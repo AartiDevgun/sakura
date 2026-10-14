@@ -36,6 +36,7 @@ export async function POST(request: Request) {
         body.data.company,
         body.data.angleId,
         request.signal,
+        body.data.researchId,
       )
     } else {
       result = await mockInvestigation(
