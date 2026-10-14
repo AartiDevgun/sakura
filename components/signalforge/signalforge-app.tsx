@@ -21,7 +21,6 @@ import { ResearchTunnel } from './research-tunnel'
 import { PeekRating } from './peek-rating'
 import { JellyRadio } from './jelly-radio'
 import { CounterargumentExplorer } from './counterargument-explorer'
-import DitherVeil from './dither-veil'
 
 const INTRO_HOLD_MS = 2200
 
@@ -221,34 +220,16 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                 Investigate public evidence, uncover unusual patterns, and challenge
                 the explanations behind them.
               </p>
-              <div className="relative mt-4 h-52 overflow-hidden rounded-2xl border border-pink-200/15 bg-zinc-950 sm:h-64">
-                <DitherVeil
-                  src="https://images.unsplash.com/photo-1478436127897-769e1b3f0f36?q=85&w=1800&auto=format&fit=crop"
-                  className="absolute inset-0"
-                  style={{ width: '100%', height: '100%' }}
-                  fit="cover"
-                  pattern="floyd"
-                  palette="duotone"
-                  inkColor="#090509"
-                  paperColor="#f7c2dc"
-                  rimColor="#fb7185"
-                  pixelSize={3}
-                  levels={2}
-                  contrast={1.2}
-                  revealRadius={150}
-                  softness={0.68}
-                  linger={1.35}
-                  rim={0.16}
-                  wander
-                  clickBurst
-                />
-                <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/10" />
-                <div className="pointer-events-none absolute inset-x-4 bottom-4 flex items-end justify-between gap-4 sm:inset-x-6 sm:bottom-5">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-pink-200/80">SAKURA / SIGNAL & SUBSTANCE</p>
-                    <p className="mt-1 text-sm text-pink-50/90">Move through the image to reveal the detail.</p>
-                  </div>
-                  <span className="hidden rounded-full border border-pink-100/20 bg-black/30 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-pink-100/65 sm:inline-flex">Interactive</span>
+              <div className="relative mt-4 flex min-h-44 items-end overflow-hidden rounded-2xl border border-pink-200/15 bg-[#080608] p-5 sm:min-h-52 sm:p-7">
+                <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(ellipse_at_78%_12%,rgba(244,114,182,0.18),transparent_42%),radial-gradient(ellipse_at_12%_100%,rgba(190,24,93,0.12),transparent_48%)]" />
+                <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-pink-200/35 to-transparent" />
+                <div aria-hidden="true" className="absolute right-7 top-6 size-24 rounded-full border border-pink-200/10 sm:right-12 sm:top-7 sm:size-32" />
+                <div aria-hidden="true" className="absolute right-12 top-11 size-14 rounded-full border border-pink-200/10 sm:right-20 sm:top-14 sm:size-20" />
+                <div aria-hidden="true" className="absolute right-[4.4rem] top-[3.4rem] size-2 rounded-full bg-pink-200/80 shadow-[0_0_22px_rgba(244,114,182,0.8)] sm:right-[6.4rem] sm:top-[4.4rem]" />
+                <div className="relative z-10 max-w-md">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-pink-200/80">SAKURA / SIGNAL & SUBSTANCE</p>
+                  <p className="mt-2 text-lg font-medium tracking-tight text-pink-50 sm:text-xl">Evidence first. Assumptions last.</p>
+                  <p className="mt-2 text-sm leading-6 text-rose-100/55">Independent research built around traceable sources, calculated signals, and alternative explanations.</p>
                 </div>
               </div>
             </div>
