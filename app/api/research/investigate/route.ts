@@ -21,23 +21,24 @@ export async function POST(request: Request) {
   try {
     let result
 
-    if (process.env.SIGNALFORGE_API_URL) {
-      result = await callBackend(
-        '/investigations',
-        body.data,
-        investigationResponseSchema,
-        request.signal,
-      )
-    } else if (
-      process.env.TAVILY_API_KEY &&
-      process.env.GROQ_API_KEY
-    ) {
+    // Match the provider selected by /api/research. Local sessions are stored
+    // in Redis, so the follow-up must use the same local engine when configured.
+    if (process.env.TAVILY_API_KEY && process.env.GROQ_API_KEY) {
       result = await liveInvestigation(
         body.data.company,
         body.data.angleId,
         request.signal,
         body.data.researchId,
       )
+    } else if (process.env.SIGNALFORGE_API_URL) {
+      result = await callBackend(
+        '/investigations',
+        body.data,
+        investigationResponseSchema,
+        request.signal,
+      )
+    } else if (getBackendMode() === 'live') {
+      throw new Error('Live research is selected, but no research provider is configured.')
     } else {
       result = await mockInvestigation(
         body.data.company,
