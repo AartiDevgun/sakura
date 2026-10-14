@@ -424,7 +424,7 @@ export async function liveResearch(
   const sources = await collectEvidence(company, undefined, signal)
   const result = await askForJson(
     RESEARCH_SYSTEM,
-    `Investigate ${company} and propose 3-4 distinct research angles that could uncover non-obvious financial signals.
+    `Investigate ${company} and propose 3-4 distinct research angles that could uncover non-obvious financial signals in Track A: Banking, NBFCs & Financial Services. Rank the angles from strongest to weakest by likely novelty, evidence availability, ability to calculate a meaningful change, and ability to test a counterargument. The first angle must be the best candidate for an autonomous first investigation.
 
 Use this evidence:
 ${JSON.stringify(evidenceForPrompt(sources))}
