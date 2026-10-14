@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { ArrowUpRight, BookOpen, CalendarDays, ChartNoAxesCombined, FlaskConical, MessageCircle, Network, Sparkles, type LucideIcon } from 'lucide-react'
+import { ArrowUpRight, BookOpen, CalendarDays, ChartNoAxesCombined, FlaskConical, MessageCircle, Network, Search, type LucideIcon } from 'lucide-react'
 import type { BackendMode, InvestigationResponse, ResearchResponse } from '@/lib/research/schema'
 import { CounterargumentExplorer } from './counterargument-explorer'
 import { FollowupPanel } from './follow-up-panel'
@@ -11,7 +11,7 @@ import { PeekRating } from './peek-rating'
 type SectionKey = 'discovery' | 'evidence' | 'numbers' | 'timeline' | 'challenge' | 'sources' | 'followup'
 
 const SECTIONS: { id: SectionKey; label: string; icon: LucideIcon; note: string }[] = [
-  { id: 'discovery', label: 'Discovery', icon: Sparkles, note: 'The signal' },
+  { id: 'discovery', label: 'Discovery', icon: Search, note: 'The signal' },
   { id: 'evidence', label: 'Evidence trail', icon: Network, note: 'What supports it' },
   { id: 'numbers', label: 'Numbers', icon: ChartNoAxesCombined, note: 'Calculated changes' },
   { id: 'timeline', label: 'Timeline', icon: CalendarDays, note: 'When it emerged' },
@@ -48,7 +48,7 @@ export function ReportDashboard({
     <section className="space-y-5" aria-labelledby="research-report-heading">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-pink-300/75">SAKURA intelligence · Track A</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-pink-300/75">SAKURA / Research note</p>
           <h2 id="research-report-heading" className="mt-2 text-2xl font-semibold tracking-tight text-rose-50 sm:text-3xl">{research.company}</h2>
           <p className="mt-1 text-sm text-rose-100/45">Banking, NBFCs & financial services · Public-evidence investigation</p>
         </div>
