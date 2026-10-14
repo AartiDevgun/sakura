@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useReducedMotion } from 'motion/react'
@@ -16,7 +17,6 @@ import { AppHeader } from './app-header'
 import { BrandLogo } from './brand-logo'
 import { CompanyPrompt } from './company-prompt'
 import { RequestError } from './request-error'
-import { ResearchProgress } from './research-progress'
 import { ResearchTunnel } from './research-tunnel'
 
 const INTRO_HOLD_MS = 2200
@@ -146,7 +146,8 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
 
   const docked = intro !== 'intro'
   const ready = intro === 'done'
-  const busy = flow.step === 'researching' || flow.step === 'investigating'
+  const busy =
+    flow.step === 'researching' || flow.step === 'investigating'
 
   const lastCompany =
     flow.step === 'idle'
@@ -155,6 +156,13 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
         ? flow.company
         : flow.research.company
 
+  const activeCompany =
+    flow.step === 'researching'
+      ? flow.company
+      : flow.step === 'investigating'
+        ? flow.research.company
+        : ''
+
   const activeAngle =
     flow.step === 'investigating' || flow.step === 'investigation-error'
       ? flow.research.angles.find(angle => angle.id === flow.angleId)
@@ -162,6 +170,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
 
   return (
     <>
+      {/* The one and only fullscreen Light Tunnel during research */}
       {busy ? <ResearchTunnel /> : null}
 
       <BrandLogo
@@ -186,56 +195,16 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
         onReset={flow.step === 'idle' || busy ? undefined : reset}
       />
 
+      {/* Hide the whole normal page while the tunnel is active */}
       <main
-        inert={!ready}
+        inert={!ready || busy}
         aria-busy={busy}
         className={cn(
-          'relative z-10 flex min-h-dvh w-full transition-opacity duration-500 motion-reduce:transition-none',
-          busy
-            ? 'items-center justify-center px-5 py-16 text-center'
-            : 'mx-auto max-w-3xl flex-col gap-8 px-4 pt-24 pb-16',
-          ready ? 'opacity-100' : 'opacity-0',
+          'relative z-10 mx-auto flex min-h-dvh w-full max-w-3xl flex-col gap-8 px-4 pt-24 pb-16 transition-opacity duration-500 motion-reduce:transition-none',
+          ready && !busy ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
       >
-        {busy ? (
-          <div className="w-full max-w-xl">
-            <div className="mb-8">
-              <div className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-pink-300">
-                SAKURA intelligence
-              </div>
-              <h1 className="text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-                {flow.step === 'researching'
-                  ? 'Following the evidence.'
-                  : 'Challenging the hypothesis.'}
-              </h1>
-              <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-pink-100/65">
-                {flow.step === 'researching'
-                  ? `Discovering research angles for ${flow.company}.`
-                  : `Investigating ${activeAngle?.title ?? 'the selected research angle'} for ${flow.research.company}.`}
-              </p>
-            </div>
-
-            <div className="mx-auto w-full max-w-md rounded-2xl border border-pink-300/20 bg-black/55 p-5 text-left shadow-[0_0_60px_rgba(236,72,153,0.12)] backdrop-blur-md">
-              <ResearchProgress
-                label={
-                  flow.step === 'researching'
-                    ? `Researching ${flow.company}`
-                    : `Investigating ${activeAngle?.label ?? 'selected angle'}`
-                }
-                detail={
-                  flow.step === 'researching'
-                    ? 'Collecting public sources and forming candidate research angles.'
-                    : 'Reviewing source passages, calculations and alternative explanations.'
-                }
-                onCancel={reset}
-              />
-            </div>
-
-            <p className="mt-5 text-xs tracking-wide text-pink-100/40">
-              Searching · Comparing · Challenging
-            </p>
-          </div>
-        ) : (
+        {!busy ? (
           <>
             <div className="flex flex-col gap-2">
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-300">
@@ -244,21 +213,27 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
               <h1 className="text-pretty text-3xl font-semibold tracking-tight text-pink-50 sm:text-4xl">
                 Look beyond the obvious.
               </h1>
-              <p className="max-w-2xl text-pretty leading-7 text-rose-100/60">
+              <p className="text-pretty leading-7 text-rose-100/60">
                 Investigate public evidence, uncover unusual patterns, and challenge
                 the explanations behind them.
               </p>
             </div>
 
-            <CompanyPrompt
-              key={lastCompany}
-              backendMode={backendMode}
-              busy={false}
-              defaultCompany={lastCompany}
-              mockScenario={mockScenario}
-              onMockScenarioChange={setMockScenario}
-              onSubmit={runResearch}
-            />
+            {(flow.step === 'idle' ||
+              flow.step === 'research-error' ||
+              flow.step === 'angles' ||
+              flow.step === 'investigation-error' ||
+              flow.step === 'result') && (
+              <CompanyPrompt
+                key={lastCompany}
+                backendMode={backendMode}
+                busy={false}
+                defaultCompany={lastCompany}
+                mockScenario={mockScenario}
+                onMockScenarioChange={setMockScenario}
+                onSubmit={runResearch}
+              />
+            )}
 
             {flow.step === 'research-error' ? (
               <RequestError
@@ -268,7 +243,8 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
               />
             ) : null}
 
-            {flow.step === 'angles' || flow.step === 'investigation-error' ? (
+            {flow.step === 'angles' ||
+            flow.step === 'investigation-error' ? (
               <section aria-labelledby="angles-heading" className="space-y-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-300">
@@ -283,15 +259,14 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                     {flow.research.company}
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-rose-100/55">
-                    Choose one angle to investigate its supporting evidence,
+                    Select an angle to investigate its supporting evidence,
                     counterarguments and potential risks.
                   </p>
                 </div>
 
                 {flow.research.angles.length === 0 ? (
                   <div className="rounded-xl border border-pink-200/15 bg-white/[0.03] p-5 text-sm text-rose-100/70">
-                    No research angles were returned. Try another company or retry
-                    the request.
+                    No research angles were returned. Try another company or retry.
                     <button
                       type="button"
                       onClick={() => runResearch(flow.research.company)}
@@ -309,11 +284,11 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                         onClick={() =>
                           runInvestigation(flow.research, angle.id)
                         }
-                        className="group w-full rounded-2xl border border-pink-200/15 bg-gradient-to-br from-pink-950/35 to-black/70 p-5 text-left transition-all duration-300 hover:border-pink-300/60 hover:bg-pink-950/30 hover:shadow-[0_0_30px_rgba(236,72,153,0.09)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
+                        className="group w-full rounded-2xl border border-pink-200/15 bg-gradient-to-br from-pink-950/35 to-black/70 p-5 text-left transition-all duration-300 hover:border-pink-300/60 hover:shadow-[0_0_30px_rgba(236,72,153,0.09)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
                       >
                         <div className="flex items-start gap-4">
                           <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-pink-300/25 text-sm text-pink-200">
-                            0{index + 1}
+                            {String(index + 1).padStart(2, '0')}
                           </span>
                           <div className="min-w-0 flex-1">
                             <div className="mb-1 text-xs uppercase tracking-[0.16em] text-pink-300/80">
@@ -356,7 +331,8 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
               <section className="space-y-5" aria-labelledby="discovery-heading">
                 <div className="rounded-2xl border border-pink-300/25 bg-gradient-to-br from-pink-950/45 via-black to-black p-6 shadow-[0_0_45px_rgba(236,72,153,0.08)]">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-pink-300">
-                    Research discovery · {flow.investigation.discovery.confidence} confidence
+                    Research discovery · {flow.investigation.discovery.confidence}{' '}
+                    confidence
                   </p>
                   <h2
                     id="discovery-heading"
@@ -369,58 +345,76 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-pink-200/15 bg-white/[0.025] p-5">
-                  <h3 className="font-semibold text-pink-100">What the evidence supports</h3>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-rose-100/65">
+                <ReportSection title="What the evidence supports">
+                  <p className="whitespace-pre-wrap text-sm leading-7 text-rose-100/65">
                     {flow.investigation.report.thesis}
                   </p>
-                </div>
+                </ReportSection>
 
                 {flow.investigation.report.calculations.length > 0 ? (
-                  <div className="space-y-3">
+                  <section className="space-y-3">
                     <h3 className="font-semibold text-pink-100">Calculations</h3>
                     {flow.investigation.report.calculations.map((calc, index) => (
-                      <div key={`${calc.label}-${index}`} className="rounded-xl border border-pink-200/15 p-4">
+                      <div
+                        key={`${calc.label}-${index}`}
+                        className="rounded-xl border border-pink-200/15 p-4"
+                      >
                         <p className="font-medium text-pink-50">{calc.label}</p>
                         <p className="mt-2 text-sm text-pink-200">{calc.result}</p>
-                        <p className="mt-1 text-xs text-rose-100/50">{calc.formula}</p>
-                        <p className="mt-2 text-sm leading-6 text-rose-100/65">{calc.interpretation}</p>
+                        <p className="mt-1 text-xs text-rose-100/50">
+                          {calc.formula}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-rose-100/65">
+                          {calc.interpretation}
+                        </p>
                       </div>
                     ))}
-                  </div>
+                  </section>
                 ) : null}
 
                 {flow.investigation.report.timeline.length > 0 ? (
-                  <div className="space-y-3">
+                  <section className="space-y-3">
                     <h3 className="font-semibold text-pink-100">Timeline</h3>
                     {flow.investigation.report.timeline.map((event, index) => (
-                      <div key={`${event.date}-${index}`} className="border-l border-pink-300/35 pl-4 py-1">
+                      <div
+                        key={`${event.date}-${index}`}
+                        className="border-l border-pink-300/35 py-1 pl-4"
+                      >
                         <p className="text-xs text-pink-300">{event.date}</p>
-                        <p className="mt-1 text-sm leading-6 text-rose-100/75">{event.event}</p>
+                        <p className="mt-1 text-sm leading-6 text-rose-100/75">
+                          {event.event}
+                        </p>
                       </div>
                     ))}
-                  </div>
+                  </section>
                 ) : null}
 
-                <div className="rounded-2xl border border-pink-200/15 p-5">
-                  <h3 className="font-semibold text-pink-100">Counterarguments</h3>
+                <ReportSection title="Counterarguments">
                   {flow.investigation.report.counterarguments.length ? (
-                    <div className="mt-3 space-y-4">
-                      {flow.investigation.report.counterarguments.map((item, index) => (
-                        <div key={`${item.argument}-${index}`}>
-                          <p className="text-sm font-medium text-pink-50">{item.argument}</p>
-                          <p className="mt-1 text-sm leading-6 text-rose-100/60">{item.assessment}</p>
-                        </div>
-                      ))}
+                    <div className="space-y-4">
+                      {flow.investigation.report.counterarguments.map(
+                        (item, index) => (
+                          <div key={`${item.argument}-${index}`}>
+                            <p className="text-sm font-medium text-pink-50">
+                              {item.argument}
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-rose-100/60">
+                              {item.assessment}
+                            </p>
+                          </div>
+                        ),
+                      )}
                     </div>
                   ) : (
-                    <p className="mt-2 text-sm text-rose-100/60">No counterarguments were returned. Treat the conclusion as incomplete until alternatives are assessed.</p>
+                    <p className="text-sm text-rose-100/60">
+                      No counterarguments were returned. Treat the conclusion as
+                      incomplete until alternatives are assessed.
+                    </p>
                   )}
-                </div>
+                </ReportSection>
 
-                <div className="rounded-2xl border border-pink-300/25 bg-pink-950/20 p-5">
-                  <h3 className="font-semibold text-pink-100">What would change this conclusion?</h3>
-                  <p className="mt-2 text-sm leading-6 text-rose-100/70">
+                <ReportSection title="What would change this conclusion?">
+                  <p className="text-sm leading-6 text-rose-100/70">
                     {flow.investigation.report.falsification.condition}
                   </p>
                   {flow.investigation.report.falsification.metric ? (
@@ -428,9 +422,9 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                       Monitor: {flow.investigation.report.falsification.metric}
                     </p>
                   ) : null}
-                </div>
+                </ReportSection>
 
-                <div className="space-y-3">
+                <section className="space-y-3">
                   <h3 className="font-semibold text-pink-100">Evidence sources</h3>
                   {flow.investigation.report.sources.map(source => (
                     <a
@@ -441,17 +435,23 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                       className="block rounded-xl border border-pink-200/15 p-4 transition-colors hover:border-pink-300/50"
                     >
                       <p className="font-medium text-pink-100">{source.title}</p>
-                      <p className="mt-1 break-all text-xs text-pink-300/70">{source.publisher || source.url}</p>
+                      <p className="mt-1 break-all text-xs text-pink-300/70">
+                        {source.publisher || source.url}
+                      </p>
                       {source.publishedAt ? (
-                        <p className="mt-1 text-xs text-rose-100/45">Published: {source.publishedAt}</p>
+                        <p className="mt-1 text-xs text-rose-100/45">
+                          Published: {source.publishedAt}
+                        </p>
                       ) : null}
                     </a>
                   ))}
-                </div>
+                </section>
 
                 <button
                   type="button"
-                  onClick={() => setFlow({ step: 'angles', research: flow.research })}
+                  onClick={() =>
+                    setFlow({ step: 'angles', research: flow.research })
+                  }
                   className="text-sm text-pink-300 underline underline-offset-4 hover:text-pink-100"
                 >
                   Explore another research angle
@@ -461,6 +461,55 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
           </>
         )}
       </main>
+
+      {/* Minimal, centred thinking text: no panel, no secondary loader */}
+      {busy ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center px-6 text-center"
+        >
+          <div className="max-w-2xl">
+            <p className="text-xs font-medium uppercase tracking-[0.4em] text-pink-300/80">
+              SAKURA intelligence
+            </p>
+            <h1 className="mt-5 text-4xl font-light tracking-wide text-pink-50 sm:text-6xl">
+              Thinking<span className="animate-pulse text-pink-400">...</span>
+            </h1>
+            <p className="mt-5 text-sm leading-6 text-pink-100/65">
+              {flow.step === 'researching'
+                ? `Exploring public evidence for ${activeCompany}.`
+                : `Examining evidence and challenging the hypothesis for ${activeCompany}.`}
+            </p>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }
+
+function ReportSection({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-2xl border border-pink-200/15 bg-white/[0.025] p-5">
+      <h3 className="mb-3 font-semibold text-pink-100">{title}</h3>
+      {children}
+    </div>
+  )
+}
+```
+
+## Instructions
+
+1. Open `components/signalforge/signalforge-app.tsx`.
+2. Press **Ctrl + A** and replace everything with the code above.
+3. Press **Ctrl + S**.
+4. Commit and push to your `sakura-research-v1` branch.
+5. Check the Vercel Preview deployment. Make sure it says **Ready** before visiting it.
+
+This keeps the tunnel behind the text, hides the prompt during research, and removes the old `ResearchProgress` panel from the loading state. The research angle and report screens remain accessible when the request completes.
