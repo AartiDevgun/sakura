@@ -839,8 +839,12 @@ export async function liveFollowup(
   const sources = mergeEvidence(session.evidence, freshEvidence)
   await putJson('research-session', researchId, { ...session, evidence: sources }, RESEARCH_SESSION_TTL_SECONDS)
 
+  const followupSystem = RESEARCH_SYSTEM.replace(
+    'Generate investigation hypotheses, not investment recommendations.',
+    'Answer grounded follow-up questions from supplied public evidence, not investment recommendations.',
+  )
   const result = await askForJson(
-    RESEARCH_SYSTEM,
+    followupSystem,
     [
       'Answer this follow-up question as a sceptical financial research investigator.',
       '',
