@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import { Renderer, Program, Mesh, Triangle, Texture, RenderTarget } from 'ogl';
 
-import './DitherVeil.css';
+import './dither-veil.css';
 
 type Pattern = 'bayer' | 'noise' | 'atkinson' | 'floyd' | 'lines';
 type Palette = 'duotone' | 'rgb';
