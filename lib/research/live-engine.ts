@@ -350,7 +350,7 @@ async function askForJson(
             { role: 'user', content: prompt },
           ],
           response_format: { type: 'json_object' },
-          max_completion_tokens: 3000,
+          max_completion_tokens: 2000,
         }),
         signal,
         cache: 'no-store',
@@ -376,15 +376,18 @@ async function askForJson(
 }
 
 function evidenceForPrompt(sources: Evidence[]) {
-  return sources.map((item, index) => ({
+  // Bound prompt size: investigations combine initial and fresh evidence,
+  // which can otherwise exceed Groq request/context limits.
+  // Indexes remain aligned with the first eight entries in the source array.
+  return sources.slice(0, 8).map((item, index) => ({
     sourceIndex: index,
-    title: item.source.title,
+    title: item.source.title.slice(0, 180),
     url: item.source.url,
     publisher: item.source.publisher,
     publishedAt: item.source.publishedAt ?? null,
     sourceType: item.source.sourceType ?? 'other',
     sourceTier: item.source.sourceTier ?? 'unverified',
-    excerpt: item.content.slice(0, 2000),
+    excerpt: item.content.slice(0, 1000),
   }))
 }
 
