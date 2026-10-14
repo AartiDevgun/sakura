@@ -20,6 +20,7 @@ import { RequestError } from './request-error'
 import { ResearchTunnel } from './research-tunnel'
 import { EvidenceFlipCard } from './evidence-flip-card'
 import { PeekRating } from './peek-rating'
+import DitherVeil from './dither-veil'
 
 const INTRO_HOLD_MS = 2200
 
@@ -202,7 +203,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
         inert={!ready || busy}
         aria-busy={busy}
         className={cn(
-          'relative z-10 mx-auto flex min-h-dvh w-full max-w-3xl flex-col gap-8 px-4 pt-24 pb-16 transition-opacity duration-500 motion-reduce:transition-none',
+          'relative z-10 mx-auto flex min-h-dvh w-full max-w-3xl flex-col gap-8 px-4 pt-24 pb-64 sm:pb-56 transition-opacity duration-500 motion-reduce:transition-none',
           ready && !busy ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
       >
@@ -219,23 +220,37 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                 Investigate public evidence, uncover unusual patterns, and challenge
                 the explanations behind them.
               </p>
+              <div className="relative mt-4 h-52 overflow-hidden rounded-2xl border border-pink-200/15 bg-zinc-950 sm:h-64">
+                <DitherVeil
+                  src="https://images.unsplash.com/photo-1522383225653-ed111181a951?q=85&w=1600&auto=format&fit=crop"
+                  className="absolute inset-0"
+                  style={{ width: '100%', height: '100%' }}
+                  fit="cover"
+                  pattern="floyd"
+                  palette="duotone"
+                  inkColor="#090509"
+                  paperColor="#f7c2dc"
+                  rimColor="#fb7185"
+                  pixelSize={3}
+                  levels={2}
+                  contrast={1.2}
+                  revealRadius={150}
+                  softness={0.68}
+                  linger={1.35}
+                  rim={0.16}
+                  wander
+                  clickBurst
+                />
+                <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/10" />
+                <div className="pointer-events-none absolute inset-x-4 bottom-4 flex items-end justify-between gap-4 sm:inset-x-6 sm:bottom-5">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-pink-200/80">SAKURA / SIGNAL & SUBSTANCE</p>
+                    <p className="mt-1 text-sm text-pink-50/90">Move through the image to reveal the detail.</p>
+                  </div>
+                  <span className="hidden rounded-full border border-pink-100/20 bg-black/30 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-pink-100/65 sm:inline-flex">Interactive</span>
+                </div>
+              </div>
             </div>
-
-            {(flow.step === 'idle' ||
-              flow.step === 'research-error' ||
-              flow.step === 'angles' ||
-              flow.step === 'investigation-error' ||
-              flow.step === 'result') && (
-              <CompanyPrompt
-                key={lastCompany}
-                backendMode={backendMode}
-                busy={false}
-                defaultCompany={lastCompany}
-                mockScenario={mockScenario}
-                onMockScenarioChange={setMockScenario}
-                onSubmit={runResearch}
-              />
-            )}
 
             {flow.step === 'research-error' ? (
               <RequestError
@@ -521,6 +536,29 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
           </>
         )}
       </main>
+
+      {ready && !busy && (
+        (flow.step === 'idle' ||
+          flow.step === 'research-error' ||
+          flow.step === 'angles' ||
+          flow.step === 'investigation-error' ||
+          flow.step === 'result') && (
+          <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-5">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-t from-black via-black/95 to-black/0" />
+            <div className="mx-auto w-full max-w-3xl">
+              <CompanyPrompt
+                key={lastCompany}
+                backendMode={backendMode}
+                busy={false}
+                defaultCompany={lastCompany}
+                mockScenario={mockScenario}
+                onMockScenarioChange={setMockScenario}
+                onSubmit={runResearch}
+              />
+            </div>
+          </div>
+        )
+      )}
 
       {/* Minimal, centred thinking text: no panel, no secondary loader */}
       {busy ? (
