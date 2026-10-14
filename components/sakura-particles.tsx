@@ -15,7 +15,7 @@ type Petal = {
   petal: boolean
 }
 
-const PETAL_COUNT = 118
+const PETAL_COUNT = 180
 
 export function SakuraParticles() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -37,14 +37,14 @@ export function SakuraParticles() {
     const createParticle = (initial: boolean): Petal => ({
       x: Math.random() * width,
       y: initial ? Math.random() * height : -12 - Math.random() * 80,
-      size: 0.8 + Math.random() * 3.1,
-      speed: 8 + Math.random() * 19,
-      drift: (Math.random() - 0.5) * 18,
+      size: 1.3 + Math.random() * 4.4,
+      speed: 13 + Math.random() * 25,
+      drift: (Math.random() - 0.5) * 23,
       phase: Math.random() * Math.PI * 2,
       rotation: Math.random() * Math.PI * 2,
       spin: (Math.random() - 0.5) * 1.1,
-      alpha: 0.12 + Math.random() * 0.42,
-      petal: Math.random() > 0.38,
+      alpha: 0.28 + Math.random() * 0.48,
+      petal: Math.random() > 0.27,
     })
 
     const resize = () => {
@@ -67,13 +67,15 @@ export function SakuraParticles() {
       context.translate(x, p.y)
       context.rotate(p.rotation + Math.sin(time * 0.00035 + p.phase) * 0.18)
       context.globalAlpha = p.alpha
+      context.shadowBlur = Math.max(2, p.size * (p.petal ? 2.3 : 4.2))
+      context.shadowColor = 'rgba(249, 168, 212, 0.78)'
 
       if (p.petal) {
         const r = p.size
         const gradient = context.createLinearGradient(-r, -r, r, r)
-        gradient.addColorStop(0, 'rgba(255, 222, 238, 0.96)')
-        gradient.addColorStop(0.58, 'rgba(244, 114, 182, 0.82)')
-        gradient.addColorStop(1, 'rgba(190, 24, 93, 0.48)')
+        gradient.addColorStop(0, 'rgba(255, 240, 248, 1)')
+        gradient.addColorStop(0.48, 'rgba(249, 168, 212, 0.96)')
+        gradient.addColorStop(1, 'rgba(219, 39, 119, 0.82)')
         context.fillStyle = gradient
         context.beginPath()
         context.moveTo(0, r * 1.35)
@@ -81,9 +83,7 @@ export function SakuraParticles() {
         context.bezierCurveTo(r * 1.5, -r * 1.4, r * 1.75, r * 0.2, 0, r * 1.35)
         context.fill()
       } else {
-        context.shadowBlur = p.size * 5
-        context.shadowColor = 'rgba(251, 182, 206, 0.8)'
-        context.fillStyle = 'rgba(255, 226, 239, 0.9)'
+        context.fillStyle = 'rgba(255, 240, 248, 1)'
         context.beginPath()
         context.arc(0, 0, p.size * 0.52, 0, Math.PI * 2)
         context.fill()
@@ -135,11 +135,19 @@ export function SakuraParticles() {
   }, [])
 
   return (
-    <canvas
-      ref={canvasRef}
+    <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-0 block h-dvh w-screen"
-      style={{ opacity: 0.82 }}
-    />
+      className="pointer-events-none fixed inset-0 z-[1] overflow-hidden"
+      style={{
+        background:
+          'radial-gradient(ellipse at 12% 18%, rgba(190, 24, 93, 0.16), transparent 43%), radial-gradient(ellipse at 88% 72%, rgba(236, 72, 153, 0.11), transparent 40%)',
+      }}
+    >
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 block h-full w-full"
+        style={{ opacity: 0.98 }}
+      />
+    </div>
   )
 }
