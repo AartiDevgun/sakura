@@ -5,9 +5,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-cormorant), Georgia, Cambria, 'Times New Roman', Times, serif;
-  --font-mono: var(--font-dm-mono), ui-monospace, monospace;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -53,24 +52,24 @@
 /* SignalForge is dark-only: the WebGL effects are tuned for a dark canvas. */
 :root {
   color-scheme: dark;
-  --background: oklch(0.045 0.003 20);
+  --background: oklch(0.045 0.012 330);
   --foreground: oklch(0.96 0.008 350);
-  --card: oklch(0.085 0.003 20);
+  --card: oklch(0.09 0.012 330);
   --card-foreground: oklch(0.96 0.008 350);
-  --popover: oklch(0.085 0.003 20);
+  --popover: oklch(0.09 0.012 330);
   --popover-foreground: oklch(0.96 0.008 350);
   --primary: oklch(0.83 0.13 350);
   --primary-foreground: oklch(0.14 0.02 350);
-  --secondary: oklch(0.14 0.004 20);
+  --secondary: oklch(0.15 0.014 330);
   --secondary-foreground: oklch(0.96 0.008 350);
-  --muted: oklch(0.13 0.004 20);
+  --muted: oklch(0.13 0.012 330);
   --muted-foreground: oklch(0.7 0.025 350);
-  --accent: oklch(0.18 0.025 350);
+  --accent: oklch(0.2 0.045 350);
   --accent-foreground: oklch(0.96 0.008 350);
   --destructive: oklch(0.7 0.19 22);
   --warning: oklch(0.84 0.15 80);
   --warning-foreground: oklch(0.2 0.03 80);
-  --border: oklch(1 0 0 / 13%);
+  --border: oklch(1 0 0 / 11%);
   --input: oklch(1 0 0 / 16%);
   --ring: oklch(0.83 0.13 350);
   --chart-1: oklch(0.83 0.13 350);
@@ -96,19 +95,19 @@
   body {
     @apply bg-background font-sans text-foreground;
     min-height: 100dvh;
-    background-color: #080708;
+    background-color: #050206;
   }
 }
 
 
 html {
-  background: #080708;
+  background: #050206;
   scroll-behavior: smooth;
 }
 
 body {
   min-height: 100dvh;
-  background: #080708;
+  background: #050206;
 }
 
 ::selection {
