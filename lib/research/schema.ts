@@ -41,6 +41,12 @@ export const investigateRequestSchema = z.object({
   angleId: z.string().min(1).max(200),
 })
 
+export const followupRequestSchema = z.object({
+  researchId: z.string().min(1).max(200),
+  company: companyInputSchema,
+  question: z.string().trim().min(4, 'Ask a question with a little more detail.').max(1000),
+})
+
 const sourceRef = z.string().min(1).optional()
 
 export const sourceSchema = z.object({
@@ -69,6 +75,26 @@ export const sourceSchema = z.object({
 })
 
 export type Source = z.infer<typeof sourceSchema>
+
+export const evidenceClaimSchema = z.object({
+  claim: z.string().min(1),
+  quote: z.string().min(15),
+  sourceId: z.string().min(1),
+  date: z.string().optional(),
+})
+
+export type EvidenceClaim = z.infer<typeof evidenceClaimSchema>
+
+export const followupResponseSchema = z.object({
+  mode: backendModeSchema,
+  followupId: z.string().min(1),
+  question: z.string().min(1),
+  answer: z.string().min(1),
+  caveat: z.string().optional(),
+  sources: z.array(sourceSchema),
+})
+
+export type FollowupResponse = z.infer<typeof followupResponseSchema>
 
 export const calculationSchema = z.object({
   label: z.string().min(1),
@@ -111,10 +137,13 @@ export const investigationResponseSchema = z.object({
     headline: z.string().min(1),
     summary: z.string().min(1),
     confidence: z.enum(['low', 'medium', 'high']),
+    whyItMatters: z.array(z.string()).max(5).optional(),
+    confidenceReason: z.string().optional(),
   }),
 
   report: z.object({
     thesis: z.string().min(1),
+    evidence: z.array(evidenceClaimSchema).optional(),
     calculations: z.array(calculationSchema),
     timeline: z.array(timelineEventSchema),
     counterarguments: z.array(counterargumentSchema),
