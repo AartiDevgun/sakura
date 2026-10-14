@@ -102,34 +102,20 @@ function matchesDomain(host: string, domains: string[]): boolean {
  * particular document or claim is authentic or accurate.
  */
 function classifySource(host: string): SourceClassification {
-  const exchanges = ['nseindia.com', 'bseindia.com']
+  const exchanges = ['nseindia.com', 'bseindia.com', 'nasdaq.com', 'nyse.com']
   const regulators = [
-    'sebi.gov.in',
-    'rbi.org.in',
-    'mca.gov.in',
-    'pib.gov.in',
-    'mospi.gov.in',
-    'finance.gov.in',
+    'sebi.gov.in', 'rbi.org.in', 'mca.gov.in', 'pib.gov.in', 'mospi.gov.in',
+    'finance.gov.in', 'sec.gov', 'investor.gov', 'federalreserve.gov',
+    'finra.org', 'fca.org.uk', 'gov.uk', 'europa.eu',
   ]
   const financialMedia = [
-    'reuters.com',
-    'bloomberg.com',
-    'moneycontrol.com',
-    'economictimes.indiatimes.com',
-    'business-standard.com',
-    'livemint.com',
-    'financialexpress.com',
-    'thehindubusinessline.com',
-    'cnbctv18.com',
-    'ft.com',
-    'wsj.com',
+    'reuters.com', 'bloomberg.com', 'moneycontrol.com',
+    'economictimes.indiatimes.com', 'business-standard.com', 'livemint.com',
+    'financialexpress.com', 'thehindubusinessline.com', 'cnbctv18.com',
+    'ft.com', 'wsj.com', 'cnbc.com', 'marketwatch.com', 'fortune.com',
   ]
   const industrySources = [
-    'crisil.com',
-    'icra.in',
-    'careedge.in',
-    'ibef.org',
-    'investindia.gov.in',
+    'crisil.com', 'icra.in', 'careedge.in', 'ibef.org', 'investindia.gov.in',
   ]
 
   if (matchesDomain(host, exchanges)) {
@@ -137,6 +123,16 @@ function classifySource(host: string): SourceClassification {
   }
   if (matchesDomain(host, regulators)) {
     return { sourceType: 'regulator', sourceTier: 'primary' }
+  }
+  // Issuer investor-relations pages are primary for their own disclosures;
+  // this label describes provenance, not whether a claim is true.
+  if (
+    host.startsWith('investor.') ||
+    host.startsWith('ir.') ||
+    host.includes('.investor.') ||
+    host.includes('.ir.')
+  ) {
+    return { sourceType: 'other', sourceTier: 'primary' }
   }
   if (matchesDomain(host, financialMedia)) {
     return { sourceType: 'financial_media', sourceTier: 'secondary' }
