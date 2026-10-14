@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import type { ResearchAngle } from '@/lib/research/schema'
 
@@ -12,6 +13,7 @@ interface JellyRadioProps {
 
 export function JellyRadio({ angles, company, onSelect, disabled = false }: JellyRadioProps) {
   const reduce = useReducedMotion()
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   return (
     <div role="radiogroup" aria-label={`Research angles for ${company}`} className="grid gap-3">
@@ -20,12 +22,15 @@ export function JellyRadio({ angles, company, onSelect, disabled = false }: Jell
           key={angle.id}
           type="button"
           role="radio"
-          aria-checked="false"
+          aria-checked={selectedId === angle.id}
           disabled={disabled}
           whileHover={reduce || disabled ? undefined : { scale: 1.012, y: -2 }}
           whileTap={reduce || disabled ? undefined : { scale: 0.975, borderRadius: 28 }}
           transition={{ type: 'spring', stiffness: 360, damping: 18, mass: 0.7 }}
-          onClick={() => onSelect(angle.id)}
+          onClick={() => {
+            setSelectedId(angle.id)
+            onSelect(angle.id)
+          }}
           className="group relative w-full overflow-hidden rounded-2xl border border-pink-200/15 bg-gradient-to-br from-pink-950/35 to-black/80 p-5 text-left outline-none transition-colors hover:border-pink-300/60 focus-visible:ring-2 focus-visible:ring-pink-300 disabled:cursor-wait disabled:opacity-60"
         >
           <motion.span
