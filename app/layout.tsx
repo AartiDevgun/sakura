@@ -7,7 +7,7 @@ const geistSans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
-  title: 'SAKURA : presented by Team Unstoppable',
+  title: 'SAKURA : presented by Team ',
   description:
     'Research a company, choose an angle, and get an evidence report with calculations, dates, counterarguments and sources.',
   generator: 'v0.app',

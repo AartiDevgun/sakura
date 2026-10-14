@@ -97,7 +97,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
           docked ? 'opacity-0' : 'opacity-100',
         )}
       >
-        SignalForge
+      SAKURA
       </div>
 
       <AppHeader visible={docked} backendMode={backendMode} onReset={flow.step === 'idle' ? undefined : reset} />
