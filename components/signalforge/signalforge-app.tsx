@@ -289,21 +289,19 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
       ) : null}
 
       {busy ? (
-        <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center px-6 text-center">
-          <div className="max-w-2xl">
-            <p className="text-[10px] font-medium uppercase tracking-[0.42em] text-pink-300/80">SAKURA intelligence</p>
-            <h1 className="mt-5 text-4xl font-light tracking-wide text-rose-50 sm:text-6xl">
-              {followupBusy ? 'Following the evidence' : 'Thinking'}<span className="animate-pulse text-pink-400">...</span>
-            </h1>
-            <p className="mt-5 text-sm leading-6 text-pink-100/60">
-              {followupBusy
-                ? 'Searching for fresh support and alternative explanations for ' + activeCompany + '.'
-                : flow.step === 'researching'
-                  ? 'Exploring public evidence for ' + activeCompany + '.'
-                  : 'Examining evidence and challenging the hypothesis for ' + activeCompany + '.'}
+        <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center bg-[#080708]/95 px-6 text-left">
+          <div className="w-full max-w-lg border-t border-pink-200/30 pt-5">
+            <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-stone-500">
+              Research in progress <span className="mx-2 text-pink-200/60">/</span> {activeCompany}
             </p>
-            <div className="mx-auto mt-8 h-px w-36 overflow-hidden bg-pink-100/10">
-              <div className="h-full w-1/2 animate-[sakura-scan_1.8s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-pink-300 to-transparent" />
+            <h1 className="mt-5 font-serif text-3xl font-medium leading-tight text-stone-100 sm:text-4xl">
+              {followupBusy ? 'Checking another explanation.' : flow.step === 'researching' ? 'Reading the public record.' : 'Testing the hypothesis.'}
+            </h1>
+            <p className="mt-4 max-w-md text-sm leading-7 text-stone-400">
+              Comparing source passages and dates before presenting a finding. This can take a moment.
+            </p>
+            <div className="mt-8 h-px w-full bg-white/[0.12]">
+              <div className="h-full w-1/3 animate-[sakura-scan_2.4s_ease-in-out_infinite] bg-pink-200/60" />
             </div>
           </div>
         </div>
