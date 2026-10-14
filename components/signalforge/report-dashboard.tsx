@@ -118,6 +118,18 @@ export function ReportDashboard({
                       {discovery.whyItMatters.slice(0, 5).map((item, index) => <li key={index} className="flex gap-2 text-sm leading-6 text-rose-100/65"><span className="mt-0.5 text-pink-300">↳</span><span>{item}</span></li>)}
                     </ul>
                   ) : <p className="mt-2 text-sm leading-6 text-rose-100/55">The available evidence and limitations are described in the thesis and evidence trail.</p>}
+                  {report.evidence && report.evidence.length > 0 ? (
+                    <div className="mt-5 space-y-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-pink-200/60">Verified evidence anchors</p>
+                      {report.evidence.slice(0, 2).map((item, index) => {
+                        const source = report.sources.find(candidate => candidate.id === item.sourceId)
+                        return <div key={item.sourceId + '-' + index} className="rounded-xl border border-pink-200/10 bg-black/35 p-3">
+                          <p className="text-xs leading-5 text-rose-100/65">“{item.quote}”</p>
+                          {source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-[10px] text-pink-300 underline underline-offset-4">{source.title} ↗</a> : null}
+                        </div>
+                      })}
+                    </div>
+                  ) : null}
                   <div className="mt-auto flex flex-wrap items-end justify-between gap-4 pt-5">
                     <p className="text-xs text-rose-100/35">Confidence: {discovery.confidenceReason || 'Based on the number and provenance of sources, with limitations shown in the report.'}</p>
                     <button type="button" onClick={() => setFlipped(false)} aria-expanded={flipped} className="shrink-0 rounded-full border border-pink-200/30 px-4 py-2.5 text-xs font-semibold text-pink-100 transition hover:bg-pink-200/[0.08] focus-visible:outline-2 focus-visible:outline-pink-300">Back to discovery ↶</button>
