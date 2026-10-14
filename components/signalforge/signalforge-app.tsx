@@ -21,6 +21,10 @@ import { ResearchTunnel } from './research-tunnel'
 import { JellyRadio } from './jelly-radio'
 import { ReportDashboard } from './report-dashboard'
 
+const INTRO_HOLD_MS = 1100
+
+type IntroPhase = 'intro' | 'docking' | 'done'
+
 type Flow =
   | { step: 'idle' }
   | { step: 'researching'; company: string }
@@ -31,10 +35,29 @@ type Flow =
   | { step: 'result'; research: ResearchResponse; investigation: InvestigationResponse }
 
 export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
+  const [intro, setIntro] = useState<IntroPhase>('intro')
   const [flow, setFlow] = useState<Flow>({ step: 'idle' })
   const [mockScenario, setMockScenario] = useState<MockScenario>('default')
   const [followupBusy, setFollowupBusy] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    if (intro !== 'intro') return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduce) {
+      setIntro('done')
+      return
+    }
+    const skip = () => setIntro('docking')
+    const timer = window.setTimeout(skip, INTRO_HOLD_MS)
+    window.addEventListener('keydown', skip, { once: true })
+    window.addEventListener('pointerdown', skip, { once: true })
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('keydown', skip)
+      window.removeEventListener('pointerdown', skip)
+    }
+  }, [intro])
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
@@ -89,9 +112,8 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
     setFlow({ step: 'idle' })
   }
 
-  // Render directly in the settled state; keep the crystal-ball effect, skip the intro animation.
-  const docked = true
-  const ready = true
+  const docked = intro !== 'intro'
+  const ready = intro === 'done'
   const researching = flow.step === 'researching' || flow.step === 'investigating'
   const busy = researching || followupBusy
   const lastCompany = flow.step === 'idle'
@@ -113,7 +135,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
 
       {!busy ? (
         <>
-          <BrandLogo docked={docked} electrified={false} />
+          <BrandLogo docked={docked} electrified={!ready} onDocked={() => setIntro('done')} />
           <div
             aria-hidden="true"
             className={cn(
