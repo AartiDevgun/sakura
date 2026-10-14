@@ -761,7 +761,7 @@ Rules:
   if (sources.length < 2 && confidence === 'medium') confidence = 'low'
 
   const falsification = record(result.falsification)
-  return {
+  const response: InvestigationResponse = {
     mode: 'live',
     investigationId: `investigation-${randomUUID()}`,
     angleId,
