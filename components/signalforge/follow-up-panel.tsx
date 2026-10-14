@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowUpRight, LoaderCircle, Sparkles } from 'lucide-react'
 import { postJson } from '@/lib/research/client'
 import {
-  followupRequestSchema,
   followupResponseSchema,
   type BackendMode,
   type FollowupResponse,
@@ -70,6 +69,7 @@ export function FollowupPanel({
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-pink-300/75">Continue the investigation</p>
           <h3 className="mt-1 text-lg font-semibold tracking-tight text-rose-50">Ask SAKURA a follow-up</h3>
           <p className="mt-1 text-sm leading-6 text-rose-100/55">Ask it to test a claim, compare a competitor, inspect a specific year or explain a metric. Live mode searches public evidence again.</p>
+          <p className="mt-2 line-clamp-2 border-l border-pink-200/20 pl-3 text-xs leading-5 text-pink-100/45">Current finding: {investigation.discovery.headline}</p>
         </div>
       </div>
 
