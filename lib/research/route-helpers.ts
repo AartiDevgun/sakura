@@ -38,7 +38,7 @@ export function errorResponse(error: unknown) {
       /^Invalid SAKURA (Tavily|Groq) daily limit\.$/.test(message) ||
       /^Web search failed \(\d{3}\)\.$/.test(message) ||
       /^AI analysis failed \(\d{3}\)\. Check your API limits\.$/.test(message) ||
-      /^Daily (Groq analysis|Tavily search) limit reached\. Increase SAKURA_(GROQ|TAVILY)_DAILY_LIMIT in Vercel Preview within your (Groq|Tavily) plan limits, or retry after the daily reset\.$/.test(message) ||
+      /^Daily (Groq analysis|Tavily search) allowance reached\. It resets at 05:30 IST\. Increase SAKURA_(GROQ|TAVILY)_DAILY_LIMIT in Vercel Preview only within your (Groq|Tavily) plan limits, or retry after reset\.$/.test(message) ||
       message === 'SAKURA usage protection is unavailable. Live research is paused.' ||
       message === 'SAKURA Redis is not configured.' ||
       message === 'The AI returned an empty response.' ||
@@ -53,9 +53,11 @@ export function errorResponse(error: unknown) {
         message.startsWith('The selected research angle')
       const providerError = message.startsWith('Web search failed') ||
         message.startsWith('AI analysis failed')
+      const quotaError = message.startsWith('Daily Groq analysis allowance reached') ||
+        message.startsWith('Daily Tavily search allowance reached')
       return NextResponse.json(
         { error: message },
-        { status: clientError ? 400 : providerError ? 502 : 503 },
+        { status: clientError ? 400 : quotaError ? 429 : providerError ? 502 : 503 },
       )
     }
   }
