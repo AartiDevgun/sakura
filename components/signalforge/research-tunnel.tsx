@@ -2,6 +2,7 @@
 'use client'
 
 import LightTunnel from '@/components/react-bits/light-tunnel'
+import { ResearchTunnel } from './research-tunnel'
 
 export function ResearchTunnel() {
   return (
