@@ -15,7 +15,7 @@ type Petal = {
   petal: boolean
 }
 
-const PETAL_COUNT = 42
+const PETAL_COUNT = 180
 
 export function SakuraParticles() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -37,13 +37,13 @@ export function SakuraParticles() {
     const createParticle = (initial: boolean): Petal => ({
       x: Math.random() * width,
       y: initial ? Math.random() * height : -12 - Math.random() * 80,
-      size: 1.1 + Math.random() * 2.5,
-      speed: 8 + Math.random() * 16,
+      size: 1.3 + Math.random() * 4.4,
+      speed: 13 + Math.random() * 25,
       drift: (Math.random() - 0.5) * 23,
       phase: Math.random() * Math.PI * 2,
       rotation: Math.random() * Math.PI * 2,
       spin: (Math.random() - 0.5) * 1.1,
-      alpha: 0.13 + Math.random() * 0.24,
+      alpha: 0.28 + Math.random() * 0.48,
       petal: Math.random() > 0.27,
     })
 
@@ -67,8 +67,8 @@ export function SakuraParticles() {
       context.translate(x, p.y)
       context.rotate(p.rotation + Math.sin(time * 0.00035 + p.phase) * 0.18)
       context.globalAlpha = p.alpha
-      context.shadowBlur = p.size * 0.55
-      context.shadowColor = 'rgba(249, 168, 212, 0.34)'
+      context.shadowBlur = Math.max(2, p.size * (p.petal ? 2.3 : 4.2))
+      context.shadowColor = 'rgba(249, 168, 212, 0.78)'
 
       if (p.petal) {
         const r = p.size
@@ -140,13 +140,13 @@ export function SakuraParticles() {
       className="pointer-events-none fixed inset-0 z-[1] overflow-hidden"
       style={{
         background:
-          'radial-gradient(ellipse at 12% 18%, rgba(120, 28, 64, 0.08), transparent 43%), radial-gradient(ellipse at 88% 72%, rgba(160, 58, 104, 0.06), transparent 40%)',
+          'radial-gradient(ellipse at 12% 18%, rgba(190, 24, 93, 0.16), transparent 43%), radial-gradient(ellipse at 88% 72%, rgba(236, 72, 153, 0.11), transparent 40%)',
       }}
     >
       <canvas
         ref={canvasRef}
         className="absolute inset-0 block h-full w-full"
-        style={{ opacity: 0.72 }}
+        style={{ opacity: 0.98 }}
       />
     </div>
   )
