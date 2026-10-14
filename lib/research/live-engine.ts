@@ -177,37 +177,64 @@ async function askForJson(
   prompt: string,
   signal?: AbortSignal,
 ): Promise<JsonObject> {
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${requiredEnv('GROQ_API_KEY')}`,
-      'Content-Type': 'application/json',
+  return cachedJson<JsonObject>(
+    'groq-analysis',
+    `${MODEL}\0${system}\0${prompt}`,
+    21600,
+    async () => {
+      const limit = Number.parseInt(
+        process.env.SAKURA_GROQ_DAILY_LIMIT ?? '20',
+        10,
+      )
+
+      if (!Number.isSafeInteger(limit) || limit < 1) {
+        throw new Error('Invalid SAKURA Groq daily limit.')
+      }
+
+      await consumeDailyBudget('groq', limit)
+
+      const response = await fetch(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${requiredEnv('GROQ_API_KEY')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: prompt },
+            ],
+            response_format: { type: 'json_object' },
+            max_completion_tokens: 3000,
+          }),
+          signal,
+          cache: 'no-store',
+        },
+      )
+
+      if (!response.ok) {
+        throw new Error(
+          `AI analysis failed (${response.status}). Check your API limits.`,
+        )
+      }
+
+      const payload = (await response.json()) as {
+        choices?: { message?: { content?: string | null } }[]
+      }
+
+      const content = payload.choices?.[0]?.message?.content
+      if (!content) throw new Error('The AI returned an empty response.')
+
+      try {
+        return record(JSON.parse(content))
+      } catch {
+        throw new Error('The AI returned invalid JSON. Please retry.')
+      }
     },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: prompt },
-      ],
-      response_format: { type: 'json_object' },
-      max_completion_tokens: 3000,
-    }),
-    signal,
-    cache: 'no-store',
-  });
-  if (!response.ok) {
-    throw new Error(`AI analysis failed (${response.status}). Check the model and API limits.`);
-  }
-  const payload = (await response.json()) as {
-    choices?: { message?: { content?: string | null; }; }[];
-  };
-  const content = payload.choices?.[0]?.message?.content;
-  if (!content) throw new Error('The AI returned an empty response.');
-  try {
-    return record(JSON.parse(content));
-  } catch {
-    throw new Error('The AI returned invalid JSON. Please retry the investigation.');
-  }
+  )
 }
 
 function evidenceForPrompt(sources: Evidence[]) {
