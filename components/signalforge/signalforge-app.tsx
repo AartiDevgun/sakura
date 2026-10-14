@@ -131,6 +131,26 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
   return (
     <>
       {!busy ? <SakuraParticles /> : null}
+      {!busy ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-[2] overflow-hidden"
+        >
+          <CrystalizedBall
+            preset="plasma"
+            color="#f472b6"
+            theme="dark"
+            size={3.2}
+            particleCount={12000}
+            speed={0.72}
+            motion="fall"
+            interactive={false}
+            intro={false}
+            className="h-full w-full"
+            style={{ width: '100%', height: '100%' }}
+          />
+        </div>
+      ) : null}
       {busy ? <ResearchTunnel /> : null}
 
       {!busy ? (
@@ -168,27 +188,6 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
             <div className="inline-flex items-center gap-2 rounded-full border border-pink-200/20 bg-black/50 px-3.5 py-2 text-[10px] font-semibold uppercase tracking-[0.21em] text-pink-200/85 shadow-[0_0_32px_rgba(236,72,153,0.06)] backdrop-blur">
               <span className="size-1.5 rounded-full bg-pink-300 shadow-[0_0_10px_rgba(244,114,182,0.85)]" />
               Autonomous financial research
-            </div>
-
-            <div
-              role="img"
-              aria-label="Interactive crystal sphere with an electric pink rim and glowing dust. Move the pointer over it to stir the light."
-              className="relative mt-1 shrink-0 overflow-hidden"
-              style={{ width: 'min(13rem, 68vw)', height: 'min(13rem, 68vw)' }}
-            >
-              <CrystalizedBall
-                preset="plasma"
-                color="#f472b6"
-                theme="dark"
-                size={0.7}
-                particleCount={7200}
-                speed={0.72}
-                motion="rise"
-                interactive
-                hoverStrength={0.78}
-                className="h-full w-full"
-                style={{ position: 'relative', width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%' }}
-              />
             </div>
 
             <h1 className="mt-7 max-w-4xl text-balance font-serif text-4xl font-bold leading-[1.06] tracking-[-0.045em] text-rose-50 sm:text-6xl md:text-7xl">
