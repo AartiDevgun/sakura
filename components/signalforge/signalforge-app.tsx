@@ -93,7 +93,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
       <div
         aria-hidden="true"
         className={cn(
-          'pointer-events-none fixed inset-x-0 top-[calc(50%+72px)] z-50 text-center font-mono text-2xl font-semibold tracking-tight transition-opacity duration-500 motion-reduce:transition-none',
+          'pointer-events-none fixed inset-x-0 top-[calc(50%+72px)] z-50 text-center font-mono text-2xl font-bold tracking-tight transition-opacity duration-500 motion-reduce:transition-none',
           docked ? 'opacity-0' : 'opacity-100',
         )}
       >
