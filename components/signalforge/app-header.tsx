@@ -1,7 +1,6 @@
 import { Button } from '@/components/ui/button'
 import type { BackendMode } from '@/lib/research/schema'
 import { cn } from '@/lib/utils'
-import { MockBadge } from './mock-badge'
 
 interface AppHeaderProps {
   visible: boolean
@@ -13,13 +12,17 @@ export function AppHeader({ visible, backendMode, onReset }: AppHeaderProps) {
   return (
     <header
       className={cn(
-        'fixed inset-x-0 top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md transition-opacity duration-500 motion-reduce:transition-none',
+        'fixed inset-x-0 top-0 z-40 border-b border-white/[0.07] bg-black/45 backdrop-blur-xl transition-opacity duration-500 motion-reduce:transition-none',
         visible ? 'opacity-100' : 'pointer-events-none opacity-0',
       )}
     >
       {/* pr-16 reserves the slot the docked Electric Logo occupies. */}
-      <div className="mx-auto flex h-16 max-w-3xl items-center gap-3 px-4 pr-16 md:pr-4">
-        <p className="text-sm font-semibold tracking-[0.2em]">SAKURA : Your personal financial analyst</p>
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 pr-20 sm:px-6">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold tracking-[0.27em] text-rose-50">SAKURA</p>
+          <p className="mt-0.5 hidden text-[9px] uppercase tracking-[0.17em] text-rose-100/35 sm:block">Autonomous financial investigator</p>
+        </div>
+        <span className="hidden rounded-full border border-pink-200/15 bg-pink-200/[0.04] px-3 py-1.5 text-[9px] font-medium uppercase tracking-[0.15em] text-pink-100/60 md:inline-flex">Track A · Financial services</span>
         {onReset ? (
           <Button variant="ghost" size="sm" className="ml-auto" onClick={onReset}>
             New research
