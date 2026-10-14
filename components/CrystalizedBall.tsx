@@ -985,9 +985,16 @@ const CrystalizedBall = ({
       return undefined;
     }
     const canvas = gl.canvas;
+    // Keep the WebGL drawing surface pinned to the measured square container.
+    // Without explicit containment, the canvas can visually escape the intended hero slot.
     canvas.style.display = 'block';
+    canvas.style.position = 'absolute';
+    canvas.style.inset = '0';
     canvas.style.width = '100%';
     canvas.style.height = '100%';
+    canvas.style.maxWidth = '100%';
+    canvas.style.maxHeight = '100%';
+    canvas.style.pointerEvents = 'none';
     canvas.setAttribute('aria-hidden', 'true');
     container.appendChild(canvas);
 
