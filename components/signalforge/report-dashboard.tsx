@@ -39,6 +39,7 @@ export function ReportDashboard({
   const reduce = useReducedMotion()
   const report = investigation.report
   const discovery = investigation.discovery
+  const selectedAngle = research.angles.find(angle => angle.id === investigation.angleId)
   const cited = new Set((report.evidence ?? []).map(item => item.sourceId))
   const primaryCount = report.sources.filter(source => source.sourceTier === 'primary').length
   const confidenceLabel = discovery.confidence === 'high' ? 'Strong' : discovery.confidence === 'medium' ? 'Moderate' : 'Weak'
@@ -56,6 +57,11 @@ export function ReportDashboard({
           <StatChip label="Primary" value={String(primaryCount)} />
           <StatChip label="Evidence strength" value={confidenceLabel} />
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-pink-200/10 bg-black/35 px-4 py-3 sm:flex sm:items-center sm:gap-4">
+        <p className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.17em] text-pink-300/60">Hypothesis tested</p>
+        <p className="mt-1 text-xs leading-5 text-rose-100/65 sm:mt-0">{selectedAngle?.title || 'The strongest hypothesis supported by the retrieved public evidence'}</p>
       </div>
 
       <div className="rounded-2xl border border-pink-200/10 bg-black/40 p-2 backdrop-blur-md">
