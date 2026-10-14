@@ -31,6 +31,34 @@ export function errorResponse(error: unknown) {
   if (error instanceof MockScenarioError) {
     return NextResponse.json({ error: error.message }, { status: 502 })
   }
+  if (error instanceof Error) {
+    const message = error.message
+    const safeOperationalError =
+      /^Missing environment variable: [A-Z0-9_]+$/.test(message) ||
+      /^Invalid SAKURA (Tavily|Groq) daily limit\.$/.test(message) ||
+      /^Web search failed \(\d{3}\)\.$/.test(message) ||
+      /^AI analysis failed \(\d{3}\)\. Check your API limits\.$/.test(message) ||
+      /^Daily (tavily|groq) limit reached\. Please try again tomorrow\.$/.test(message) ||
+      message === 'SAKURA usage protection is unavailable. Live research is paused.' ||
+      message === 'SAKURA Redis is not configured.' ||
+      message === 'The AI returned an empty response.' ||
+      message === 'The AI returned invalid JSON. Please retry.' ||
+      message === 'No usable public sources were found. Try the full company name.' ||
+      message === 'SAKURA could not form research angles from the retrieved evidence.' ||
+      message === 'Research session expired or does not match this company. Run the company search again.' ||
+      message === 'The selected research angle is not part of this research session. Please search again.' ||
+      message === 'Feedback storage is not configured.'
+    if (safeOperationalError) {
+      const clientError = message.startsWith('Research session expired') ||
+        message.startsWith('The selected research angle')
+      const providerError = message.startsWith('Web search failed') ||
+        message.startsWith('AI analysis failed')
+      return NextResponse.json(
+        { error: message },
+        { status: clientError ? 400 : providerError ? 502 : 503 },
+      )
+    }
+  }
   console.error('[signalforge] Unexpected error:', error)
   return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 })
 }
