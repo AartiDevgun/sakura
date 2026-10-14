@@ -4,7 +4,12 @@ import type { z } from 'zod'
 import type { BackendMode } from './schema'
 
 export function getBackendMode(): BackendMode {
-  return process.env.SIGNALFORGE_API_URL ? 'live' : 'mock'
+  const externalBackend = Boolean(process.env.SIGNALFORGE_API_URL)
+  const localResearch = Boolean(
+    process.env.TAVILY_API_KEY && process.env.GROQ_API_KEY
+  )
+
+  return externalBackend || localResearch ? 'live' : 'mock'
 }
 
 export class BackendError extends Error {
