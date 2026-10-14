@@ -2,7 +2,12 @@ import 'server-only';
 
 import { randomUUID } from 'node:crypto';
 
-import { cachedJson, consumeDailyBudget } from './cache';
+import {
+  cachedJson,
+  consumeDailyBudget,
+  getJson,
+  putJson,
+} from './cache'
 
 import type {
   Calculation,
@@ -28,6 +33,11 @@ type Evidence = {
   score: number;
   host: string;
 };
+type ResearchSession = {
+  company: string
+  response: ResearchResponse
+  evidence: Evidence[]
+}
 
 type JsonObject = Record<string, unknown>;
 
@@ -345,12 +355,15 @@ export async function liveResearch(
   company: string,
   signal?: AbortSignal,
 ): Promise<ResearchResponse> {
-  const sources = await collectEvidence(company, undefined, signal);
+  const sources = await collectEvidence(company, undefined, signal)
+
   const result = await askForJson(
     RESEARCH_SYSTEM,
     `Investigate ${company} and propose 3-4 distinct research angles that could uncover non-obvious financial signals.
+
 Use this evidence:
 ${JSON.stringify(evidenceForPrompt(sources))}
+
 Return JSON in this exact shape:
 {
   "angles": [
@@ -362,6 +375,77 @@ Return JSON in this exact shape:
       "sourceIndexes": [0, 1]
     }
   ]
+}
+
+sourceIndexes must refer only to supplied sourceIndex numbers. The angles are hypotheses to test, not confirmed findings. Do not force numerical claims if the sources do not support them.`,
+    signal,
+  )
+
+  const rawAngles = Array.isArray(result.angles) ? result.angles : []
+
+  if (rawAngles.length === 0) {
+    throw new Error(
+      'SAKURA could not form research angles from the retrieved evidence.',
+    )
+  }
+
+  const angles = rawAngles.slice(0, 4).map((value, index) => {
+    const item = record(value)
+    const title = text(item.title, `Research angle ${index + 1}`)
+
+    const indices = Array.isArray(item.sourceIndexes)
+      ? item.sourceIndexes
+          .map(value => validIndex(value, sources.length))
+          .filter((value): value is number => value !== undefined)
+      : []
+
+    const references = (indices.length ? indices : [0])
+      .slice(0, 3)
+      .map(i => `${sources[i].source.title} — ${sources[i].source.url}`)
+      .join('\n')
+
+    const strength = item.signalStrength
+
+    const signalStrength =
+      strength === 'weak' ||
+      strength === 'moderate' ||
+      strength === 'strong'
+        ? strength
+        : 'moderate'
+
+    return {
+      id: `angle-${index + 1}-${slug(title) || 'investigation'}`,
+      label: text(item.label, title).slice(0, 48),
+      title,
+      rationale: `${text(
+        item.rationale,
+        'Further evidence is needed to assess this angle.',
+      )}\n\nSources to examine:\n${references}`,
+      signalStrength,
+    } as const
+  })
+
+  const response: ResearchResponse = {
+    mode: 'live',
+    researchId: `research-${randomUUID()}`,
+    company,
+    angles,
+  }
+
+  const session: ResearchSession = {
+    company,
+    response,
+    evidence: sources,
+  }
+
+  await putJson(
+    'research-session',
+    response.researchId,
+    session,
+    24 * 60 * 60,
+  )
+
+  return response
 }
 sourceIndexes must refer only to supplied sourceIndex numbers. The angles are hypotheses to test, not confirmed findings. Do not force numerical claims if the sources do not support them.`,
     signal,
