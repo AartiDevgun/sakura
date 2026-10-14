@@ -760,7 +760,10 @@ Rules:
     if (confidence === 'high') confidence = 'medium'
   }
   if (sources.length < 2 && confidence === 'medium') confidence = 'low'
-
+  const confidenceWasAdjusted =
+    (rawConfidence === 'high' && confidence !== 'high') ||
+    (rawConfidence === 'medium' && confidence === 'low')
+  const confidenceReason = text(result.confidenceReason)
   const falsification = record(result.falsification)
   const response: InvestigationResponse = {
     mode: 'live',
@@ -774,7 +777,11 @@ Rules:
       ),
       confidence,
       whyItMatters,
-      confidenceReason: text(result.confidenceReason) || undefined,
+      confidenceReason: confidenceReason
+        ? confidenceReason + (confidenceWasAdjusted
+          ? ' SAKURA lowered the displayed confidence because the available source breadth or independently verified calculations did not meet its higher-confidence threshold.'
+          : '')
+        : undefined,
     },
     report: {
       thesis: text(result.thesis, 'The available evidence does not yet support a firm conclusion.'),
