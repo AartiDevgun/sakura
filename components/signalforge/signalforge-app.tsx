@@ -187,7 +187,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
           <div className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-pink-200/20 bg-black/50 px-3.5 py-2 text-[10px] font-semibold uppercase tracking-[0.21em] text-pink-200/85 shadow-[0_0_32px_rgba(236,72,153,0.06)] backdrop-blur">
               <span className="size-1.5 rounded-full bg-pink-300 shadow-[0_0_10px_rgba(244,114,182,0.85)]" />
-              Autonomous financial research
+              Financial research
             </div>
 
             <h1 className="mt-7 max-w-4xl text-balance font-serif text-4xl font-bold leading-[1.06] tracking-[-0.045em] text-rose-50 sm:text-6xl md:text-7xl">
