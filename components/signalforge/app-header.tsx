@@ -20,7 +20,7 @@ export function AppHeader({ visible, backendMode, onReset }: AppHeaderProps) {
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 pr-20 sm:px-6">
         <div className="min-w-0">
           <p className="text-sm font-semibold tracking-[0.27em] text-rose-50">SAKURA</p>
-          <p className="mt-0.5 hidden text-[9px] uppercase tracking-[0.17em] text-rose-100/35 sm:block">Autonomous financial investigator</p>
+          <p className="mt-0.5 hidden text-[9px] uppercase tracking-[0.17em] text-rose-100/35 sm:block">Financial investigator</p>
         </div>
         <span className="hidden rounded-full border border-pink-200/15 bg-pink-200/[0.04] px-3 py-1.5 text-[9px] font-medium uppercase tracking-[0.15em] text-pink-100/60 md:inline-flex">Track A · Financial services</span>
         <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] px-2.5 py-1.5 text-[9px] uppercase tracking-[0.12em] text-rose-100/45">
