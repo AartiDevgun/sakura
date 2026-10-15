@@ -7,9 +7,9 @@ const geistSans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
-  title: 'SAKURA — Autonomous Financial Research',
+  title: 'SAKURA — Financial Research',
   description:
-    'An autonomous financial research investigator that discovers, tests and traces non-obvious financial signals to public evidence.',
+    'A financial research investigator that discovers, tests and traces non-obvious financial signals to public evidence.',
   generator: 'v0.app',
   icons: {
     icon: [
