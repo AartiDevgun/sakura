@@ -656,21 +656,23 @@ export async function liveInvestigation(
   const angleRationale = selectedAngle?.rationale
     .split('\n\nSources to examine:')[0]
     .trim()
-  const angleQuery = [angleTitle, angleRationale].filter(Boolean).join(' ')
+  // Search with the selected angle's concise title rather than the full rationale.
+  // Long rationale text can make the web query over-constrained and return unusable snippets.
+  const angleQuery = angleTitle
   let freshEvidence: Evidence[] = []
   let freshSearchUnavailable = false
   try {
     freshEvidence = await collectEvidence(company, angleQuery, signal)
   } catch (error) {
-    // If the daily search budget is spent, the initial session still contains
-    // real sources. Continue transparently with those sources rather than
-    // making the angle unusable or inventing replacement evidence.
-    if (
-      session &&
-      error instanceof Error &&
-      /daily tavily limit reached/i.test(error.message)
-    ) {
+    // Cancellation should stop the work immediately rather than fall back.
+    if (error instanceof Error && error.name === 'AbortError') throw error
+
+    // The initial research stage already stored actual source excerpts in the session.
+    // If a fresh angle-specific search fails or returns no usable snippets, continue
+    // with that evidence and tell the model not to imply fresh corroboration occurred.
+    if (session && session.evidence.length > 0) {
       freshSearchUnavailable = true
+      console.warn('[SAKURA] Fresh angle-specific search unavailable; using saved session evidence.')
     } else {
       throw error
     }
@@ -684,7 +686,7 @@ export async function liveInvestigation(
 Selected angle: ${angleTitle}
 Original rationale: ${angleRationale || 'No original rationale is available.'}
 Fresh angle-specific web search: ${freshSearchUnavailable
-      ? 'UNAVAILABLE: the daily Tavily budget has been exhausted. Use only the supplied session sources and explicitly state that fresh corroboration was not possible.'
+      ? 'UNAVAILABLE: the fresh angle-specific search did not produce usable results. Use only the supplied session sources and explicitly state that fresh corroboration was not possible.'
       : 'Attempted; use only the source excerpts below and be clear if coverage is thin.'}
 
 Do not assume the hypothesis is true. Assess whether the evidence supports it, contradicts it, or is insufficient. Distinguish confirmed facts, plausible explanations, and unknowns. Explicitly mention if some searches may have failed or evidence is too thin.
