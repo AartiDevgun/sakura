@@ -116,6 +116,8 @@ export const timelineEventSchema = z.object({
   date: z.string().min(1),
   event: z.string().min(1),
   sourceId: sourceRef,
+  // Live events include the exact passage used to validate their date and claim.
+  quote: z.string().min(15).optional(),
 })
 
 export type TimelineEvent = z.infer<typeof timelineEventSchema>
