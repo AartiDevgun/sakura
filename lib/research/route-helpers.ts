@@ -37,6 +37,12 @@ export function errorResponse(error: unknown) {
       /^Missing environment variable: [A-Z0-9_]+$/.test(message) ||
       /^Invalid SAKURA (Tavily|Groq) daily limit\.$/.test(message) ||
       /^Web search failed \(\d{3}\)\.$/.test(message) ||
+      /^Groq authentication failed\\./.test(message) ||
+      /^Groq could not find the configured model/.test(message) ||
+      /^Groq rate or usage limit reached\\./.test(message) ||
+      /^Groq analysis request failed \\(\\d{3}\\)\\./.test(message) ||
+      /^No usable public sources were found after trying fallback searches\\./.test(message) ||
+      /^Search results were returned, but none contained usable source text\\./.test(message) ||
       /^AI analysis failed \(\d{3}\)\. Check your API limits\.$/.test(message) ||
       /^Daily (Groq analysis|Tavily search) allowance reached\. It resets at 05:30 IST\. Increase SAKURA_(GROQ|TAVILY)_DAILY_LIMIT in Vercel Preview only within your (Groq|Tavily) plan limits, or retry after reset\.$/.test(message) ||
       message === 'SAKURA usage protection is unavailable. Live research is paused.' ||
@@ -52,7 +58,10 @@ export function errorResponse(error: unknown) {
       const clientError = message.startsWith('Research session expired') ||
         message.startsWith('The selected research angle')
       const providerError = message.startsWith('Web search failed') ||
-        message.startsWith('AI analysis failed')
+        message.startsWith('AI analysis failed') ||
+        message.startsWith('Groq authentication failed') ||
+        message.startsWith('Groq could not find the configured model') ||
+        message.startsWith('Groq analysis request failed')
       const quotaError = message.startsWith('Daily Groq analysis allowance reached') ||
         message.startsWith('Daily Tavily search allowance reached')
       return NextResponse.json(
