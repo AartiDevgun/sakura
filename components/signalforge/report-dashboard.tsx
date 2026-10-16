@@ -218,7 +218,7 @@ export function ReportDashboard({
                   })}
                 </div>
               </article>
-            )) : <EmptyState title="No verified calculations" copy="SAKURA chose not to manufacture a number where comparable, source-backed figures were unavailable. This is a limitation of the current evidence, not proof that no signal exists." />}
+            )) : <EmptyState title="No verified calculations" copy="No calculation passed SAKURA’s checks. A calculation needs both values, explicit comparable units, distinct reporting periods, and source quotations containing each value. This is an evidence gap—not evidence that the metric stayed unchanged. Review the Evidence Trail and Sources tabs or try another research angle." />}
           </div>
         ) : null}
 
