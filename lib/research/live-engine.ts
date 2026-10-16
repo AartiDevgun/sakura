@@ -704,7 +704,7 @@ Return JSON in this shape:
   "thesis": "What the evidence supports and what it does not establish",
   "evidence": [
     {
-      "claim": "One factual claim tied to the finding",
+      "claim": "A distinct, material, source-backed observation that adds information beyond the main headline",
       "quote": "An exact passage copied from the supplied source excerpt, at least 15 characters",
       "sourceIndex": 0,
       "date": "A date or reporting period if present, otherwise an empty string"
@@ -741,6 +741,9 @@ Return JSON in this shape:
 
 Rules:
 - Use only the supplied sources and their sourceIndex values.
+- Return 4-6 evidence items when the excerpts support them. Aim for at least four genuinely distinct observations; return fewer only when the evidence does not support more.
+- Each evidence item must add a separate material fact or disclosure, not repeat or lightly rephrase the headline or another item. Prefer different source documents and business dimensions when available.
+- Every evidence quote must be copied verbatim from the supplied excerpts and be at least 15 characters long. The application will independently verify each quote and will display an observation only when the quote matches retrieved source text.
 - Include calculations only when both figures and exact quotations are present in the excerpts; the application independently calculates the result.
 - If values are missing or incomparable, return an empty calculationCandidates array.
 - Include real counterarguments, not straw men.
