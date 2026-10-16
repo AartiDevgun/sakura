@@ -704,9 +704,27 @@ Return JSON in this shape:
   "thesis": "What the evidence supports and what it does not establish",
   "evidence": [
     {
-      "claim": "A distinct, material, source-backed observation that adds information beyond the main headline",
-      "quote": "An exact passage copied from the supplied source excerpt, at least 15 characters",
+      "claim": "Distinct material observation 1, adding information beyond the main headline",
+      "quote": "Exact passage copied verbatim from a supplied source excerpt",
       "sourceIndex": 0,
+      "date": "A date or reporting period if present, otherwise an empty string"
+    },
+    {
+      "claim": "Distinct material observation 2, not a rephrasing of observation 1",
+      "quote": "A different exact passage copied from the supplied source excerpts",
+      "sourceIndex": 1,
+      "date": "A date or reporting period if present, otherwise an empty string"
+    },
+    {
+      "claim": "Distinct material observation 3, from a different fact or disclosure",
+      "quote": "Another exact passage copied from the supplied source excerpts",
+      "sourceIndex": 2,
+      "date": "A date or reporting period if present, otherwise an empty string"
+    },
+    {
+      "claim": "Distinct material observation 4, where the evidence supports one",
+      "quote": "Another exact passage copied from the supplied source excerpts",
+      "sourceIndex": 3,
       "date": "A date or reporting period if present, otherwise an empty string"
     }
   ],
