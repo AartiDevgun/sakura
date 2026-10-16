@@ -134,7 +134,10 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
       {!busy ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-0 z-[2] overflow-hidden"
+          className={cn(
+            'pointer-events-none fixed inset-0 z-[2] overflow-hidden transition-opacity duration-700',
+            homeScreen ? 'opacity-50' : 'opacity-20',
+          )}
         >
           <CrystalizedBall
             preset="plasma"
@@ -143,6 +146,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
             size={3.2}
             particleCount={12000}
             speed={0.72}
+            dustSpeed={0.38}
             motion="fall"
             interactive={false}
             intro={false}
