@@ -224,15 +224,15 @@ export function ReportDashboard({
 
         {active === 'timeline' ? (
           <div className="space-y-3">
-            <SectionHeading eyebrow="Temporal reasoning" title="When did the signal start to change?" copy="Events are linked to sources whenever the underlying source could be identified." />
+            <SectionHeading eyebrow="Temporal reasoning" title="When did the signal start to change?" copy="A timeline event appears only when its date and supporting passage can be matched to retrieved source text." />
             {report.timeline.length > 0 ? (
               <div className="relative space-y-3 before:absolute before:bottom-5 before:left-[10px] before:top-5 before:w-px before:bg-pink-200/20">
                 {report.timeline.map((event, index) => {
                   const source = report.sources.find(candidate => candidate.id === event.sourceId)
-                  return <article key={event.date + index} className="relative pl-8"><span className="absolute left-[5px] top-5 size-[11px] rounded-full border border-pink-200/65 bg-[#180c14] shadow-[0_0_12px_rgba(244,114,182,0.25)]" /><div className="rounded-2xl border border-pink-200/12 bg-black/45 p-4"><p className="text-xs font-semibold tracking-wide text-pink-300">{event.date}</p><p className="mt-2 text-sm leading-6 text-rose-50/80">{event.event}</p>{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-pink-300 underline underline-offset-4">{source.publisher || source.title} ↗</a> : null}</div></article>
+                  return <article key={event.date + index} className="relative pl-8"><span className="absolute left-[5px] top-5 size-[11px] rounded-full border border-pink-200/65 bg-[#180c14] shadow-[0_0_12px_rgba(244,114,182,0.25)]" /><div className="rounded-2xl border border-pink-200/12 bg-black/45 p-4"><p className="text-xs font-semibold tracking-wide text-pink-300">{event.date}</p><p className="mt-2 text-sm leading-6 text-rose-50/80">{event.event}</p>{event.quote ? <blockquote className="mt-3 border-l-2 border-pink-300/40 pl-3 text-xs leading-5 text-rose-100/45">“{event.quote}”</blockquote> : null}{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-pink-300 underline underline-offset-4">{source.publisher || source.title} ↗</a> : null}</div></article>
                 })}
               </div>
-            ) : <EmptyState title="No supported timeline returned" copy="The available material was not sufficient to present a reliable sequence of events." />}
+            ) : <EmptyState title="No supported timeline returned" copy="No dated event passed source-quote verification. This does not mean nothing happened; it means SAKURA could not safely establish the sequence from the retrieved excerpts. Try another angle or inspect the source ledger." />}
           </div>
         ) : null}
 
