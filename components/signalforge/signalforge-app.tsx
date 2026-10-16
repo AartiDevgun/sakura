@@ -191,7 +191,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
             </div>
 
             <h1 className="mt-7 max-w-4xl text-balance font-serif text-4xl font-bold leading-[1.06] tracking-[-0.045em] text-rose-50 sm:text-6xl md:text-7xl">
-              The most important signal
+              The most important insight
               <span className="mt-1 block italic text-pink-200">is often hiding in plain sight.</span>
             </h1>
 
