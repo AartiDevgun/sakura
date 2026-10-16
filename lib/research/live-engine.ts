@@ -198,6 +198,16 @@ async function cachedSearchOnly(query: string): Promise<SearchResult[]> {
   }
 }
 
+function isUsableSearchResult(item: SearchResult): boolean {
+  if (!item.title?.trim() || !text(item.raw_content, text(item.content))) return false
+  try {
+    const url = new URL(item.url ?? '')
+    return url.protocol === 'https:' || url.protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
 async function collectEvidence(
   company: string,
   angle?: string,
@@ -207,47 +217,63 @@ async function collectEvidence(
   // supports more complete research sessions without sacrificing source breadth.
   // One carefully composed search per stage makes the live agent less quota-hungry.
   // Tavily still returns multiple independent public sources for triangulation.
-  const queries = [
-    angle
-      ? `"${company}" ${angle} annual report quarterly results investor presentation exchange filing competitor alternative explanation`
-      : `"${company}" annual report latest quarterly results investor presentation financial metrics competitors industry trends bank NBFC deposits advances asset quality funding mix`,
-  ]
+  // Search narrowly first, then broaden only when the returned results are unusable.
+  // This keeps normal requests quota-efficient while making transient/empty searches recoverable.
+  const queries = angle
+    ? [
+        `"${company}" ${angle}`,
+        `"${company}" quarterly financial results annual report investor relations`,
+        `${company} exchange filing annual report financial results`,
+      ]
+    : [
+        `"${company}" latest quarterly financial results annual report investor relations`,
+        `${company} annual report financial statements quarterly results`,
+        `${company} official investor relations exchange filing earnings`,
+      ]
 
-  // Partial search success is useful, but a total failure must not become a fake report.
-  const batches = await Promise.allSettled(queries.map(query => searchWeb(query, signal)))
-  const rejected = batches.filter(batch => batch.status === 'rejected')
-  let candidates = batches.flatMap(batch =>
-    batch.status === 'fulfilled' ? batch.value : [],
-  )
+  const candidates: SearchResult[] = []
+  const searchErrors: Error[] = []
 
-  if (candidates.length === 0 && rejected.length > 0) {
-    const firstReason = rejected[0]
-    const tavilyBudgetSpent = batches.some(
-      batch =>
-        batch.status === 'rejected' &&
-        batch.reason instanceof Error &&
-        /daily tavily search (?:allowance|limit) reached/i.test(batch.reason.message),
-    )
+  for (const query of queries) {
+    try {
+      const batch = await searchWeb(query, signal)
+      const usable = batch.filter(isUsableSearchResult)
+      if (usable.length > 0) {
+        candidates.push(...usable)
+        break
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') throw error
+      const searchError = error instanceof Error ? error : new Error('Public web search failed.')
+      searchErrors.push(searchError)
 
-    if (tavilyBudgetSpent) {
-      // Compatibility fallback for recent cache entries created by older query templates.
-      // This does not make any new provider request and never fabricates source data.
-      const legacyQueries = angle
-        ? [
-            `"${company}" ${angle} annual report financial results`,
-            `${company} ${angle} investor presentation exchange filing competitor industry trend`,
-          ]
-        : [
-            `${company} annual report latest quarterly financial results investor presentation`,
-            `${company} margins working capital revenue segments competitors industry trends`,
-          ]
-      const cached = await Promise.all(legacyQueries.map(cachedSearchOnly))
-      candidates = cached.flat()
+      // A quota or configuration issue will not improve by issuing more fresh searches.
+      if (
+        /daily tavily search (?:allowance|limit) reached|usage protection is unavailable|missing environment variable: tavily_api_key/i.test(searchError.message)
+      ) break
     }
+  }
 
-    if (candidates.length === 0 && firstReason.status === 'rejected' && firstReason.reason instanceof Error) {
-      throw firstReason.reason
-    }
+  if (candidates.length === 0) {
+    // Cache-only recovery is safe when the live provider is unavailable or results are empty.
+    const legacyQueries = angle
+      ? [
+          `"${company}" ${angle} annual report financial results`,
+          `${company} ${angle} investor presentation exchange filing competitor industry trend`,
+        ]
+      : [
+          `${company} annual report latest quarterly financial results investor presentation`,
+          `${company} margins working capital revenue segments competitors industry trends`,
+        ]
+    const cached = await Promise.all([...queries, ...legacyQueries].map(cachedSearchOnly))
+    candidates.push(...cached.flat().filter(isUsableSearchResult))
+  }
+
+  if (candidates.length === 0 && searchErrors.length > 0) {
+    throw searchErrors[0]
+  }
+  if (candidates.length === 0) {
+    throw new Error('No usable public sources were found after trying fallback searches. Try the company’s full legal name or ticker.')
   }
 
   const unique = new Map<string, Evidence>()
@@ -321,18 +347,7 @@ async function collectEvidence(
   })
 
   if (results.length === 0) {
-    // Preserve the budget-exhausted signal so a follow-up investigation can
-    // transparently fall back to the real sources already saved in its session.
-    const budgetError = rejected.find(
-      batch =>
-        batch.status === 'rejected' &&
-        batch.reason instanceof Error &&
-        /daily tavily limit reached/i.test(batch.reason.message),
-    )
-    if (budgetError?.status === 'rejected' && budgetError.reason instanceof Error) {
-      throw budgetError.reason
-    }
-    throw new Error('No usable public sources were found. Try the full company name.')
+    throw new Error('Search results were returned, but none contained usable source text. Try the company’s full legal name or ticker.')
   }
 
   return results
@@ -418,10 +433,44 @@ async function askForJson(
   )
 }
 
+function sourceExcerpt(content: string, maxChars = 2600): string {
+  if (content.length <= maxChars) return content
+
+  const units = content
+    .split(/(?<=[.!?])\\s+|\\n+/)
+    .map(part => part.trim())
+    .filter(Boolean)
+  const chosen: string[] = []
+  const seen = new Set<string>()
+  let size = 0
+
+  const add = (part: string) => {
+    const value = part.trim()
+    if (!value || seen.has(value) || size + value.length + 5 > maxChars) return
+    seen.add(value)
+    chosen.push(value)
+    size += value.length + 5
+  }
+
+  // Preserve context from the document opening, then prioritise dated and numeric financial passages.
+  add(content.slice(0, 600))
+  for (const unit of units) {
+    if (
+      /\\d/.test(unit) &&
+      /(₹|\\binr\\b|\\brs\\.?\\b|crore|lakh|million|billion|revenue|profit|assets?|liabilit|deposit|advance|gross npa|net npa|credit cost|margin|capital adequacy|fy\\s?\\d|q[1-4]|20\\d{2})/i.test(unit)
+    ) add(unit)
+  }
+  for (const unit of units) {
+    if (size >= maxChars - 100) break
+    add(unit)
+  }
+
+  return chosen.join('\\n[… ]\\n').slice(0, maxChars)
+}
+
 function evidenceForPrompt(sources: Evidence[]) {
-  // Bound prompt size: investigations combine initial and fresh evidence,
-  // which can otherwise exceed Groq request/context limits.
-  // Indexes remain aligned with the first eight entries in the source array.
+  // Keep excerpts bounded, but include relevant figures and reporting periods from beyond the first page.
+  // Source indexes remain aligned with the first eight entries in the source array.
   return sources.slice(0, 8).map((item, index) => ({
     sourceIndex: index,
     title: item.source.title.slice(0, 180),
@@ -430,7 +479,7 @@ function evidenceForPrompt(sources: Evidence[]) {
     publishedAt: item.source.publishedAt ?? null,
     sourceType: item.source.sourceType ?? 'other',
     sourceTier: item.source.sourceTier ?? 'unverified',
-    excerpt: item.content.slice(0, 1000),
+    excerpt: sourceExcerpt(item.content),
   }))
 }
 
@@ -549,6 +598,20 @@ function verifiedEvidenceClaims(value: unknown, sources: Evidence[]): EvidenceCl
   return claims
 }
 
+function unitIsSupported(unit: string, quote: string): boolean {
+  const label = normalise(unit)
+  if (/(?:^|\\s)(?:%|percent|percentage)(?:$|\\s)/i.test(label) || label.includes('%')) {
+    return /%|percent(?:age)?/i.test(quote)
+  }
+  if (/\\b(?:crore|crores|cr)\\b/i.test(label)) return /\\b(?:crores?|cr)\\b/i.test(quote)
+  if (/\\b(?:lakh|lakhs|lac|lacs)\\b/i.test(label)) return /\\b(?:lakhs?|lacs?)\\b/i.test(quote)
+  if (/\\b(?:million|billion|thousand)\\b/i.test(label)) return /\\b(?:million|billion|thousand)s?\\b/i.test(quote)
+  if (/\\b(?:bps|basis points)\\b/i.test(label)) return /\\bbps\\b|basis points/i.test(quote)
+  if (/\\b(?:inr|rupees?)\\b|₹/i.test(label)) return /\\bINR\\b|₹|\\bRs\\.?\\b|rupees?/i.test(quote)
+  if (/\\b(?:usd|dollars?)\\b|us\\$/i.test(label)) return /\\bUSD\\b|US\\$|\\$|dollars?/i.test(quote)
+  return Boolean(label)
+}
+
 function verifiedCalculations(value: unknown, sources: Evidence[]): Calculation[] {
   if (!Array.isArray(value)) return []
   const calculations: Calculation[] = []
@@ -561,6 +624,10 @@ function verifiedCalculations(value: unknown, sources: Evidence[]): Calculation[
     const current = item.currentValue
     const kind = item.kind
 
+    const unit = text(item.unit)
+    const priorPeriod = text(item.priorPeriod)
+    const currentPeriod = text(item.currentPeriod)
+
     if (
       priorIndex === undefined ||
       currentIndex === undefined ||
@@ -569,7 +636,11 @@ function verifiedCalculations(value: unknown, sources: Evidence[]): Calculation[
       !Number.isFinite(prior) ||
       !Number.isFinite(current) ||
       typeof item.priorQuote !== 'string' ||
-      typeof item.currentQuote !== 'string'
+      typeof item.currentQuote !== 'string' ||
+      !unit ||
+      !priorPeriod ||
+      !currentPeriod ||
+      normalise(priorPeriod) === normalise(currentPeriod)
     ) continue
 
     const priorText = sources[priorIndex].content
@@ -578,7 +649,9 @@ function verifiedCalculations(value: unknown, sources: Evidence[]): Calculation[
       !quoteIsPresent(priorText, item.priorQuote) ||
       !quoteIsPresent(currentText, item.currentQuote) ||
       !containsNumber(item.priorQuote, prior) ||
-      !containsNumber(item.currentQuote, current)
+      !containsNumber(item.currentQuote, current) ||
+      !unitIsSupported(unit, item.priorQuote) ||
+      !unitIsSupported(unit, item.currentQuote)
     ) continue
 
     let formula = ''
@@ -745,7 +818,7 @@ Return JSON in this shape:
     }
   ],
   "timeline": [
-    { "date": "YYYY-MM-DD or disclosed period", "event": "Supported event", "sourceIndex": 0 }
+    { "date": "Exact date or reporting period as written in the quote", "event": "Supported event", "sourceIndex": 0, "quote": "Exact source passage containing the date and supporting the event" }
   ],
   "counterarguments": [
     { "argument": "Strongest plausible alternative explanation", "assessment": "Evidence for or against it", "sourceIndex": 1 }
@@ -762,8 +835,10 @@ Rules:
 - Return 4-6 evidence items when the excerpts support them. Aim for at least four genuinely distinct observations; return fewer only when the evidence does not support more.
 - Each evidence item must add a separate material fact or disclosure, not repeat or lightly rephrase the headline or another item. Prefer different source documents and business dimensions when available.
 - Every evidence quote must be copied verbatim from the supplied excerpts and be at least 15 characters long. The application will independently verify each quote and will display an observation only when the quote matches retrieved source text.
-- Include calculations only when both figures and exact quotations are present in the excerpts; the application independently calculates the result.
-- If values are missing or incomparable, return an empty calculationCandidates array.
+- Include calculations only when both figures, comparable units and distinct reporting periods are present in the exact source quotations; the application independently calculates the result.
+- Include the stated unit in both calculation quotations. If values or units are missing or incomparable, return an empty calculationCandidates array.
+- Every timeline event must include an exact source quotation that contains the date or reporting period and supports the event. The application independently checks the quotation and date against retrieved source text.
+- Use only dates/period labels explicitly present in the quoted source passage. Omit timeline items whose date cannot be tied to an exact quote; never estimate or infer a date.
 - Include real counterarguments, not straw men.
 - Never invent source links, financial values, dates or causal explanations.
 - Source classifications are provenance hints, not proof of truth.
@@ -778,14 +853,27 @@ Rules:
     : []
   const timeline: TimelineEvent[] = (Array.isArray(result.timeline) ? result.timeline : [])
     .slice(0, 8)
-    .map(value => {
+    .flatMap(value => {
       const item = record(value)
       const sourceIndex = validIndex(item.sourceIndex, sources.length)
-      return {
-        date: text(item.date, 'Date not disclosed'),
-        event: text(item.event, 'Event not verified'),
-        sourceId: sourceIndex === undefined ? undefined : sources[sourceIndex].source.id,
-      }
+      const date = text(item.date)
+      const event = text(item.event)
+      const quote = text(item.quote)
+
+      if (
+        sourceIndex === undefined ||
+        !date ||
+        !event ||
+        !quoteIsPresent(sources[sourceIndex].content, quote) ||
+        !normalise(quote).includes(normalise(date))
+      ) return []
+
+      return [{
+        date,
+        event,
+        sourceId: sources[sourceIndex].source.id,
+        quote,
+      }]
     })
 
   const counterarguments: Counterargument[] = (
