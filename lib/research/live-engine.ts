@@ -467,12 +467,21 @@ function sourceExcerpt(content: string, maxChars = 2600): string {
       /(₹|\binr\b|\brs\.?\b|crore|lakh|million|billion|revenue|profit|assets?|liabilit|deposit|advance|gross npa|net npa|credit cost|margin|capital adequacy|fy\s?\d|q[1-4]|20\d{2})/i.test(unit)
     ) add(unit)
   }
+  // Some provider extracts are long table-like lines without sentence punctuation.
+  // Keep short source-native windows around numeric facts in that case.
+  if (size < maxChars - 100) {
+    for (const match of content.matchAll(/[^.!?\\n]{0,180}\\d[^.!?\\n]{0,180}/g)) {
+      add(match[0])
+      if (size >= maxChars - 100) break
+    }
+  }
+
   for (const unit of units) {
     if (size >= maxChars - 100) break
     add(unit)
   }
 
-  return chosen.join('\n[… ]\n').slice(0, maxChars)
+  return chosen.join('\\n[…]\\n').slice(0, maxChars)
 }
 function evidenceForPrompt(sources: Evidence[]) {
   // Keep excerpts bounded, but include relevant figures and reporting periods from beyond the first page.
