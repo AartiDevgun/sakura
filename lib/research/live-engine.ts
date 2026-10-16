@@ -213,10 +213,8 @@ async function collectEvidence(
   angle?: string,
   signal?: AbortSignal,
 ): Promise<Evidence[]> {
-  // Keep each phase to two focused searches so the daily Tavily budget
-  // supports more complete research sessions without sacrificing source breadth.
-  // One carefully composed search per stage makes the live agent less quota-hungry.
-  // Tavily still returns multiple independent public sources for triangulation.
+  // Normally one query is enough. Additional queries run only when results are empty/unusable,
+  // and every actual provider request remains behind the shared daily budget guard.
   // Search narrowly first, then broaden only when the returned results are unusable.
   // This keeps normal requests quota-efficient while making transient/empty searches recoverable.
   const queries = angle
@@ -415,7 +413,16 @@ async function askForJson(
       })
 
       if (!response.ok) {
-        throw new Error(`AI analysis failed (${response.status}). Check your API limits.`)
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('Groq authentication failed. Check GROQ_API_KEY in the Vercel environment used by this deployment, then redeploy.')
+        }
+        if (response.status === 404) {
+          throw new Error(`Groq could not find the configured model "${MODEL}". Check GROQ_MODEL in Vercel or remove it to use SAKURA’s default model.`)
+        }
+        if (response.status === 429) {
+          throw new Error('Groq rate or usage limit reached. Check the Groq Console usage page before retrying.')
+        }
+        throw new Error(`Groq analysis request failed (${response.status}). Check the Groq Console and SAKURA environment settings.`)
       }
 
       const payload = (await response.json()) as {
@@ -437,7 +444,7 @@ function sourceExcerpt(content: string, maxChars = 2600): string {
   if (content.length <= maxChars) return content
 
   const units = content
-    .split(/(?<=[.!?])\\s+|\\n+/)
+    .split(/(?<=[.!?])\s+|\n+/)
     .map(part => part.trim())
     .filter(Boolean)
   const chosen: string[] = []
@@ -456,8 +463,8 @@ function sourceExcerpt(content: string, maxChars = 2600): string {
   add(content.slice(0, 600))
   for (const unit of units) {
     if (
-      /\\d/.test(unit) &&
-      /(₹|\\binr\\b|\\brs\\.?\\b|crore|lakh|million|billion|revenue|profit|assets?|liabilit|deposit|advance|gross npa|net npa|credit cost|margin|capital adequacy|fy\\s?\\d|q[1-4]|20\\d{2})/i.test(unit)
+      /\d/.test(unit) &&
+      /(₹|\binr\b|\brs\.?\b|crore|lakh|million|billion|revenue|profit|assets?|liabilit|deposit|advance|gross npa|net npa|credit cost|margin|capital adequacy|fy\s?\d|q[1-4]|20\d{2})/i.test(unit)
     ) add(unit)
   }
   for (const unit of units) {
@@ -465,9 +472,8 @@ function sourceExcerpt(content: string, maxChars = 2600): string {
     add(unit)
   }
 
-  return chosen.join('\\n[… ]\\n').slice(0, maxChars)
+  return chosen.join('\n[… ]\n').slice(0, maxChars)
 }
-
 function evidenceForPrompt(sources: Evidence[]) {
   // Keep excerpts bounded, but include relevant figures and reporting periods from beyond the first page.
   // Source indexes remain aligned with the first eight entries in the source array.
@@ -600,18 +606,17 @@ function verifiedEvidenceClaims(value: unknown, sources: Evidence[]): EvidenceCl
 
 function unitIsSupported(unit: string, quote: string): boolean {
   const label = normalise(unit)
-  if (/(?:^|\\s)(?:%|percent|percentage)(?:$|\\s)/i.test(label) || label.includes('%')) {
+  if (/(?:^|\s)(?:%|percent|percentage)(?:$|\s)/i.test(label) || label.includes('%')) {
     return /%|percent(?:age)?/i.test(quote)
   }
-  if (/\\b(?:crore|crores|cr)\\b/i.test(label)) return /\\b(?:crores?|cr)\\b/i.test(quote)
-  if (/\\b(?:lakh|lakhs|lac|lacs)\\b/i.test(label)) return /\\b(?:lakhs?|lacs?)\\b/i.test(quote)
-  if (/\\b(?:million|billion|thousand)\\b/i.test(label)) return /\\b(?:million|billion|thousand)s?\\b/i.test(quote)
-  if (/\\b(?:bps|basis points)\\b/i.test(label)) return /\\bbps\\b|basis points/i.test(quote)
-  if (/\\b(?:inr|rupees?)\\b|₹/i.test(label)) return /\\bINR\\b|₹|\\bRs\\.?\\b|rupees?/i.test(quote)
-  if (/\\b(?:usd|dollars?)\\b|us\\$/i.test(label)) return /\\bUSD\\b|US\\$|\\$|dollars?/i.test(quote)
+  if (/\b(?:crore|crores|cr)\b/i.test(label)) return /\b(?:crores?|cr)\b/i.test(quote)
+  if (/\b(?:lakh|lakhs|lac|lacs)\b/i.test(label)) return /\b(?:lakhs?|lacs?)\b/i.test(quote)
+  if (/\b(?:million|billion|thousand)\b/i.test(label)) return /\b(?:million|billion|thousand)s?\b/i.test(quote)
+  if (/\b(?:bps|basis points)\b/i.test(label)) return /\bbps\b|basis points/i.test(quote)
+  if (/\b(?:inr|rupees?)\b|₹/i.test(label)) return /\bINR\b|₹|\bRs\.?\b|rupees?/i.test(quote)
+  if (/\b(?:usd|dollars?)\b|us\$/i.test(label)) return /\bUSD\b|US\$|\$|dollars?/i.test(quote)
   return Boolean(label)
 }
-
 function verifiedCalculations(value: unknown, sources: Evidence[]): Calculation[] {
   if (!Array.isArray(value)) return []
   const calculations: Calculation[] = []
