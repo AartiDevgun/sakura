@@ -35,16 +35,16 @@ export function errorResponse(error: unknown) {
     const message = error.message
     const safeOperationalError =
       /^Missing environment variable: [A-Z0-9_]+$/.test(message) ||
-      /^Invalid SAKURA (Tavily|Groq) daily limit\.$/.test(message) ||
-      /^Web search failed \(\d{3}\)\.$/.test(message) ||
-      /^Groq authentication failed\\./.test(message) ||
-      /^Groq could not find the configured model/.test(message) ||
-      /^Groq rate or usage limit reached\\./.test(message) ||
-      /^Groq analysis request failed \\(\\d{3}\\)\\./.test(message) ||
-      /^No usable public sources were found after trying fallback searches\\./.test(message) ||
-      /^Search results were returned, but none contained usable source text\\./.test(message) ||
-      /^AI analysis failed \(\d{3}\)\. Check your API limits\.$/.test(message) ||
-      /^Daily (Groq analysis|Tavily search) allowance reached\. It resets at 05:30 IST\. Increase SAKURA_(GROQ|TAVILY)_DAILY_LIMIT in Vercel Preview only within your (Groq|Tavily) plan limits, or retry after reset\.$/.test(message) ||
+      /^Invalid SAKURA (Tavily|Groq) daily limit\\.$/.test(message) ||
+      /^Web search failed \\(\\d{3}\\)\\.$/.test(message) ||
+      /^AI analysis failed \\(\\d{3}\\)\\. Check your API limits\\.$/.test(message) ||
+      message.startsWith('Groq authentication failed.') ||
+      message.startsWith('Groq could not find the configured model') ||
+      message.startsWith('Groq rate or usage limit reached.') ||
+      message.startsWith('Groq analysis request failed (') ||
+      message.startsWith('No usable public sources were found after trying fallback searches.') ||
+      message.startsWith('Search results were returned, but none contained usable source text.') ||
+      /^Daily (Groq analysis|Tavily search) allowance reached\\. It resets at 05:30 IST\\. Increase SAKURA_(GROQ|TAVILY)_DAILY_LIMIT in Vercel Preview only within your (Groq|Tavily) plan limits, or retry after reset\\.$/.test(message) ||
       message === 'SAKURA usage protection is unavailable. Live research is paused.' ||
       message === 'SAKURA Redis is not configured.' ||
       message === 'The AI returned an empty response.' ||
@@ -63,7 +63,8 @@ export function errorResponse(error: unknown) {
         message.startsWith('Groq could not find the configured model') ||
         message.startsWith('Groq analysis request failed')
       const quotaError = message.startsWith('Daily Groq analysis allowance reached') ||
-        message.startsWith('Daily Tavily search allowance reached')
+        message.startsWith('Daily Tavily search allowance reached') ||
+        message.startsWith('Groq rate or usage limit reached')
       return NextResponse.json(
         { error: message },
         { status: clientError ? 400 : quotaError ? 429 : providerError ? 502 : 503 },
