@@ -204,7 +204,7 @@ export function ReportDashboard({
 
         {active === 'numbers' ? (
           <div className="space-y-3">
-            <SectionHeading eyebrow="Calculations" title="Show the maths, not just the metric" copy="A calculation is included only when both values and their source quotations passed validation." />
+            <SectionHeading eyebrow="Calculations" title="Show the maths, not just the metric" copy="A calculation is included only when both values, distinct reporting periods, unit evidence and source quotations pass validation." />
             {report.calculations.length > 0 ? report.calculations.map((calc, index) => (
               <article key={calc.label + index} className="rounded-2xl border border-pink-200/15 bg-black/45 p-5">
                 <p className="text-sm font-semibold text-rose-50">{calc.label}</p>
