@@ -148,6 +148,37 @@ export function ReportDashboard({
               <MiniMetric icon={<ChartNoAxesCombined size={17} />} label="Calculated metrics" value={String(report.calculations.length)} detail="Results calculated by the app" />
               <MiniMetric icon={<CalendarDays size={17} />} label="Timeline events" value={String(report.timeline.length)} detail="Source-linked events" />
             </div>
+
+            {report.evidence && report.evidence.length > 0 ? (
+              <div className="space-y-3 pt-2">
+                <SectionHeading
+                  eyebrow="More from the evidence"
+                  title="Other source-backed findings"
+                  copy="Distinct observations from public sources. Each item appears only when its quoted passage matches the retrieved text."
+                />
+                <div className="grid gap-3 md:grid-cols-2">
+                  {report.evidence.slice(0, 5).map((item, index) => {
+                    const source = report.sources.find(candidate => candidate.id === item.sourceId)
+                    return (
+                      <article key={item.sourceId + '-finding-' + index} className="rounded-2xl border border-pink-200/15 bg-black/45 p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-300/70">Finding {String(index + 1).padStart(2, '0')}</p>
+                        <h3 className="mt-2 text-sm font-semibold leading-6 text-rose-50">{item.claim}</h3>
+                        <blockquote className="mt-3 border-l-2 border-pink-300/45 pl-3 text-xs leading-6 text-rose-100/60">“{item.quote}”</blockquote>
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                          {item.date ? <span className="text-[10px] text-rose-100/35">{item.date}</span> : <span />}
+                          {source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-pink-300 underline underline-offset-4">{source.title} ↗</a> : null}
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <EmptyState
+                title="No additional claims passed verification"
+                copy="SAKURA will not invent extra findings. Review the source list or try another research angle to broaden the evidence."
+              />
+            )}
           </div>
         ) : null}
 
