@@ -17,7 +17,7 @@ export function AppHeader({ visible, backendMode, onReset }: AppHeaderProps) {
       )}
     >
       {/* pr-16 reserves the slot the docked Electric Logo occupies. */}
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 pr-20 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 pr-24 sm:pl-6 sm:pr-24">
         <div className="min-w-0">
           <p className="text-sm font-semibold tracking-[0.27em] text-rose-50">SAKURA</p>
           <p className="mt-0.5 hidden text-[9px] uppercase tracking-[0.17em] text-rose-100/35 sm:block">Financial investigator</p>
