@@ -27,7 +27,7 @@ export function BrandLogo({ docked, electrified, onDocked }: BrandLogoProps) {
       className={cn(
         'pointer-events-none fixed z-50',
         'top-[calc(50%-112px)] right-[calc(50%-84px)] size-[168px]',
-        'data-[docked]:top-3 data-[docked]:right-4 data-[docked]:size-16',
+        'data-[docked]:top-3 data-[docked]:right-4 data-[docked]:size-20',
         'transition-[top,right,width,height] duration-[900ms] ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:transition-none',
       )}
     >
