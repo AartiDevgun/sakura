@@ -37,9 +37,16 @@ export function errorResponse(error: unknown) {
       message.startsWith('Missing environment variable: ') ||
       message.startsWith('Invalid SAKURA Tavily daily limit.') ||
       message.startsWith('Invalid SAKURA Groq daily limit.') ||
+      message.startsWith('Invalid SAKURA Gemini daily limit.') ||
       message.startsWith('Web search failed (') ||
       message.startsWith('AI analysis failed (') ||
       message.startsWith('Groq authentication failed.') ||
+      message.startsWith('Gemini authentication failed.') ||
+      message.startsWith('Gemini rejected the chat request.') ||
+      message.startsWith('Gemini rate or usage limit reached.') ||
+      message.startsWith('Gemini chat request failed (') ||
+      message.startsWith('Gemini request payload was too large (413).') ||
+      message.startsWith('Gemini could not answer that question due to its safety filters.') ||
       message.startsWith('Groq could not find the configured model') ||
       message.startsWith('Groq rate or usage limit reached.') ||
       message.startsWith('Groq analysis request failed (') ||
@@ -47,6 +54,7 @@ export function errorResponse(error: unknown) {
       message.startsWith('No usable public sources were found after trying fallback searches.') ||
       message.startsWith('Search results were returned, but none contained usable source text.') ||
       message.startsWith('Daily Groq analysis allowance reached.') ||
+      message.startsWith('Daily Gemini analysis allowance reached.') ||
       message.startsWith('Daily Tavily search allowance reached.') ||
       message === 'SAKURA usage protection is unavailable. Live research is paused.' ||
       message === 'SAKURA Redis is not configured.' ||
@@ -60,13 +68,19 @@ export function errorResponse(error: unknown) {
     if (safeOperationalError) {
       const clientError = message.startsWith('Research session expired') ||
         message.startsWith('The selected research angle')
-      const providerError = message.startsWith('Web search failed') ||
+      const providerError = message.startsWith('Gemini authentication failed') ||
+        message.startsWith('Gemini rejected the chat request') ||
+        message.startsWith('Gemini chat request failed') ||
+        message.startsWith('Gemini request payload was too large') ||
+        message.startsWith('Web search failed') ||
         message.startsWith('AI analysis failed') ||
         message.startsWith('Groq authentication failed') ||
         message.startsWith('Groq could not find the configured model') ||
         message.startsWith('Groq analysis request failed') ||
         message.startsWith('Groq request payload was too large')
-      const quotaError = message.startsWith('Daily Groq analysis allowance reached') ||
+      const quotaError = message.startsWith('Daily Gemini analysis allowance reached') ||
+        message.startsWith('Gemini rate or usage limit reached') ||
+        message.startsWith('Daily Groq analysis allowance reached') ||
         message.startsWith('Daily Tavily search allowance reached') ||
         message.startsWith('Groq rate or usage limit reached')
       return NextResponse.json(
