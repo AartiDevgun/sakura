@@ -706,7 +706,9 @@ Generate investigation hypotheses, not investment recommendations.
 Use only the supplied sources. Never invent facts, figures, events, URLs or quotations.
 Distinguish disclosed facts from possible interpretations.
 Source type and tier are provenance hints, not proof that a document or claim is accurate.
-Prefer relevant primary disclosures and genuinely independent corroboration.
+Prefer relevant original company financial statements, official investor presentations, exchange filings, regulator disclosures and reputable financial reporting.
+A rating-agency rationale is one independent perspective, not a substitute for the underlying disclosures; when alternatives exist, do not let rating-agency reports dominate the evidence set.
+A strong conclusion should be supported by multiple distinct documents and publishers. Do not count copied press releases as independent corroboration.
 Different URLs can repeat the same underlying press release; do not treat repetition as independent confirmation.
 If evidence is weak, conflicting or incomplete, state the limitation.
 Return valid JSON only.
@@ -824,16 +826,41 @@ function periodIsSupported(period: string, quote: string): boolean {
 
 function verifiedEvidenceClaims(value: unknown, sources: Evidence[]): EvidenceClaim[] {
   if (!Array.isArray(value)) return []
-  const claims: EvidenceClaim[] = []
-  for (const raw of value.slice(0, 10)) {
+
+  const candidates: { claim: EvidenceClaim; source: Evidence }[] = []
+  for (const raw of value.slice(0, 12)) {
     const item = record(raw)
     const sourceIndex = validIndex(item.sourceIndex, sources.length)
     const quote = text(item.quote)
     const claim = text(item.claim)
     if (sourceIndex === undefined || !claim || !quoteIsPresent(sources[sourceIndex].content, quote)) continue
-    claims.push({ claim, quote, sourceId: sources[sourceIndex].source.id, date: text(item.date) || undefined })
+    candidates.push({
+      claim: { claim, quote, sourceId: sources[sourceIndex].source.id, date: text(item.date) || undefined },
+      source: sources[sourceIndex],
+    })
   }
-  return claims
+
+  // Prefer direct disclosures and independent source documents over repeated rating commentary.
+  candidates.sort((a, b) => sourceQualityScore(b.source) - sourceQualityScore(a.source))
+  const selected: EvidenceClaim[] = []
+  const usedSourceIds = new Set<string>()
+  const usedPublishers = new Set<string>()
+  let ratingSourceCount = 0
+
+  for (const candidate of candidates) {
+    const { source } = candidate
+    if (usedSourceIds.has(candidate.claim.sourceId)) continue
+    const rating = isRatingRationale(source)
+    if (rating && ratingSourceCount >= 1) continue
+
+    selected.push(candidate.claim)
+    usedSourceIds.add(candidate.claim.sourceId)
+    usedPublishers.add(source.host)
+    if (rating) ratingSourceCount += 1
+    if (selected.length >= 8) break
+  }
+
+  return selected
 }
 
 function unitIsSupported(unit: string, quote: string): boolean {
@@ -1071,8 +1098,8 @@ Return JSON in this shape:
 
 Rules:
 - Use only the supplied sources and their sourceIndex values.
-- Return 4-6 evidence items when the excerpts support them. Aim for at least four genuinely distinct observations; return fewer only when the evidence does not support more.
-- Each evidence item must add a separate material fact or disclosure, not repeat or lightly rephrase the headline or another item. Prefer different source documents and business dimensions when available.
+- Return 4-6 evidence items when the excerpts support them. Aim for at least four genuinely distinct observations drawn from distinct source documents and publishers. Cite original filings/results/investor presentations for core financial facts and use reputable independent reporting for context. Use a rating-agency rationale only as one supporting viewpoint when other sources are available; it must not become the majority of the evidence. Return fewer only when the supplied documents do not support more.
+- Each evidence item must add a separate material fact or disclosure, not repeat or lightly rephrase the headline or another item. Use a different sourceIndex for each item whenever the source pack allows it, and include at least two primary-source documents when available. Prefer different publishers and business dimensions. Do not fill the evidence list with several observations from the same rating rationale.
 - Every evidence quote must be copied verbatim from the supplied excerpts and be at least 15 characters long. The application will independently verify each quote and will display an observation only when the quote matches retrieved source text.
 - Actively look for 1-3 useful calculations before returning an empty calculationCandidates array. Check for comparable values across periods, including revenue, deposits, advances, profit, margins, NPAs and capital ratios when relevant.
 - Include a calculation only when both figures, comparable units and distinct reporting periods are present in exact source quotations; the application independently calculates the result. Never infer a missing value.
