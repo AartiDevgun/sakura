@@ -26,6 +26,10 @@ export function JellyRadio({
   const reduce = useReducedMotion()
   const [internalSelectedId, setInternalSelectedId] = useState<string | null>(null)
   const selectedId = activeId !== undefined ? activeId : internalSelectedId
+  const strengthRank = { strong: 3, moderate: 2, weak: 1 } as const
+  const orderedAngles = [...angles].sort((a, b) =>
+    strengthRank[b.signalStrength || 'moderate'] - strengthRank[a.signalStrength || 'moderate'],
+  )
 
   return (
     <section className="space-y-3" aria-label={heading || `Research angles for ${company}`}>
@@ -39,7 +43,7 @@ export function JellyRadio({
         </div>
       ) : null}
       <div role="radiogroup" aria-label={`${heading || 'Research angles'} for ${company}`} className="grid gap-3 sm:grid-cols-2">
-        {angles.map((angle, index) => {
+        {orderedAngles.map((angle, index) => {
           const selected = selectedId === angle.id
           return (
             <motion.button
