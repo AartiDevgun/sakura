@@ -119,10 +119,7 @@ function likelyIssuerDomain(host: string, company: string): boolean {
     first + second,
   ].filter(alias => alias.length >= 5)
 
-  return aliases.some(alias => {
-    const prefix = alias.slice(0, Math.min(alias.length, 6))
-    return root.startsWith(alias) || (alias.length >= 6 && root.startsWith(prefix))
-  })
+  return aliases.some(alias => root.startsWith(alias))
 }
 
 function classifySource(host: string, company = ''): SourceClassification {
