@@ -118,7 +118,9 @@ function classifySource(host: string): SourceClassification {
     'ft.com', 'wsj.com', 'cnbc.com', 'marketwatch.com', 'fortune.com',
   ]
   const industrySources = [
-    'crisil.com', 'icra.in', 'careedge.in', 'ibef.org', 'investindia.gov.in',
+    'crisil.com', 'icra.in', 'careedge.in', 'indiaratings.co.in', 'brickworkratings.com',
+    'infomerics.com', 'acuite.in', 'fitchratings.com', 'moodys.com', 'spglobal.com',
+    'ibef.org', 'investindia.gov.in',
   ]
 
   if (matchesDomain(host, exchanges)) {
@@ -217,6 +219,9 @@ function isRatingAgencyHost(host: string): boolean {
     'brickworkratings.com',
     'infomerics.com',
     'acuite.in',
+    'fitchratings.com',
+    'moodys.com',
+    'spglobal.com',
   ])
 }
 
