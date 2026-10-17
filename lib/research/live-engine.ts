@@ -104,7 +104,28 @@ function matchesDomain(host: string, domains: string[]): boolean {
  * Classifies the apparent provenance of a domain. This is not proof that a
  * particular document or claim is authentic or accurate.
  */
-function classifySource(host: string): SourceClassification {
+function likelyIssuerDomain(host: string, company: string): boolean {
+  const root = host.split('.')[0].replace(/[^a-z0-9]/gi, '').toLowerCase()
+  const words = company.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)
+    .filter(word => word && !['limited', 'ltd', 'private', 'pvt', 'inc', 'plc', 'company', 'co'].includes(word))
+  if (root.length < 5 || words.length === 0) return false
+
+  const first = words[0]
+  const second = words[1] || ''
+  const aliases = [
+    words.join(''),
+    words.slice(0, 2).join(''),
+    first + second.slice(0, 3),
+    first + second,
+  ].filter(alias => alias.length >= 5)
+
+  return aliases.some(alias => {
+    const prefix = alias.slice(0, Math.min(alias.length, 6))
+    return root.startsWith(alias) || (alias.length >= 6 && root.startsWith(prefix))
+  })
+}
+
+function classifySource(host: string, company = ''): SourceClassification {
   const exchanges = ['nseindia.com', 'bseindia.com', 'nasdaq.com', 'nyse.com']
   const regulators = [
     'sebi.gov.in', 'rbi.org.in', 'mca.gov.in', 'pib.gov.in', 'mospi.gov.in',
@@ -144,6 +165,11 @@ function classifySource(host: string): SourceClassification {
   }
   if (matchesDomain(host, industrySources)) {
     return { sourceType: 'industry_source', sourceTier: 'secondary' }
+  }
+  // Detect likely issuer-owned domains when the hostname closely matches the company name.
+  // This is a provenance hint only; it does not prove the page or document is authentic.
+  if (company && likelyIssuerDomain(host, company)) {
+    return { sourceType: 'other', sourceTier: 'primary' }
   }
   return { sourceType: 'other', sourceTier: 'unverified' }
 }
@@ -330,7 +356,7 @@ async function collectEvidence(
     if (!sourceText) continue
 
     const host = url.hostname.toLowerCase().replace(/^www\./, '')
-    const classification = classifySource(host)
+    const classification = classifySource(host, company)
     const evidenceItem: Evidence = {
       source: {
         id: '',
