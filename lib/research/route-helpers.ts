@@ -38,6 +38,14 @@ export function errorResponse(error: unknown) {
       message.startsWith('Invalid SAKURA Tavily daily limit.') ||
       message.startsWith('Invalid SAKURA Groq daily limit.') ||
       message.startsWith('Invalid SAKURA Gemini daily limit.') ||
+      message.startsWith('Invalid SAKURA daily limit for ') ||
+      message.startsWith('Invalid SAKURA_RESEARCH_PROVIDER.') ||
+      message.startsWith('Gemini research is selected but GEMINI_API_KEY is not configured') ||
+      message.startsWith('No usable public sources were found after trying targeted searches.') ||
+      message.startsWith('Search returned pages, but none contained usable independent source text.') ||
+      message.startsWith('Redis request failed (') ||
+      message === 'Redis command failed.' ||
+      message.startsWith('Cache expiry must be an integer') ||
       message.startsWith('Web search failed (') ||
       message.startsWith('AI analysis failed (') ||
       message.startsWith('Groq authentication failed.') ||
@@ -75,7 +83,8 @@ export function errorResponse(error: unknown) {
     if (safeOperationalError) {
       const clientError = message.startsWith('Research session expired') ||
         message.startsWith('The selected research angle')
-      const providerError = message.startsWith('Gemini authentication failed') ||
+      const providerError = message.startsWith('Gemini research is selected but GEMINI_API_KEY is not configured') ||
+        message.startsWith('Gemini authentication failed') ||
         message.startsWith('Gemini could not find model') ||
         message.startsWith('Gemini rejected the research request') ||
         message.startsWith('Gemini research request failed') ||
