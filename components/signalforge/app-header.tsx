@@ -23,10 +23,7 @@ export function AppHeader({ visible, backendMode, onReset }: AppHeaderProps) {
           <p className="mt-0.5 hidden text-[9px] uppercase tracking-[0.17em] text-rose-100/35 sm:block">Financial investigator</p>
         </div>
         <span className="hidden rounded-full border border-pink-200/15 bg-pink-200/[0.04] px-3 py-1.5 text-[9px] font-medium uppercase tracking-[0.15em] text-pink-100/60 md:inline-flex">Track A · Financial services</span>
-        <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] px-2.5 py-1.5 text-[9px] uppercase tracking-[0.12em] text-rose-100/45">
-          <span className={'size-1.5 rounded-full ' + (backendMode === 'live' ? 'bg-emerald-300' : 'bg-amber-300')} />
-          {backendMode === 'live' ? 'Live engine' : 'Demo mode'}
-        </span>
+        <span className="ml-auto" />
         {onReset ? (
           <Button variant="ghost" size="sm" className="shrink-0" onClick={onReset}>
             New research
