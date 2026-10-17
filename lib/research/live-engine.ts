@@ -533,7 +533,12 @@ export async function liveResearch(
   const sources = await collectEvidence(company, undefined, signal)
   const result = await askForJson(
     RESEARCH_SYSTEM,
-    `Investigate ${company} and propose 3-4 distinct research angles that could uncover non-obvious financial signals in Track A: Banking, NBFCs & Financial Services. Rank the angles from strongest to weakest by likely novelty, evidence availability, ability to calculate a meaningful change, and ability to test a counterargument. The first angle must be the best candidate for an autonomous first investigation.
+    `Investigate ${company} for Track A: Banking, NBFCs & Financial Services. Return the three mandatory hypotheses below as the first three angles, in this order, plus at most one additional company-specific angle:
+1. Loan-book growth versus asset quality: test whether advances/loan growth and relevant asset-quality measures (gross/net NPAs, credit costs, provisioning) are moving in different directions over comparable periods.
+2. Hidden funding dependencies: test whether disclosures from banks, co-lending partners, institutional funders, rating agencies or regulators reveal dependencies not obvious from the company's own disclosures.
+3. Five-year funding mix/customer profile: compare the funding mix or customer profile over roughly five years and investigate when and why it changed.
+4. Optional company-specific hypothesis only if the supplied evidence suggests a genuinely distinct non-obvious angle.
+Rank the candidates by novelty, evidence quality and independence, comparable calculations, counterargument quality, and ability to falsify. Do not call the first hypothesis the winner before it has been tested.
 
 Use this evidence:
 ${JSON.stringify(evidenceForPrompt(sources))}
@@ -613,6 +618,24 @@ function quoteIsPresent(sourceText: string, quote: string): boolean {
   return quote.length >= 15 && normalise(sourceText).includes(normalise(quote))
 }
 
+function periodIsSupported(period: string, quote: string): boolean {
+  const normalPeriod = normalise(period)
+  const normalQuote = normalise(quote)
+  if (normalQuote.includes(normalPeriod)) return true
+
+  const years = period.match(/(?:19|20)\\d{2}/g) ?? []
+  if (years.length === 0 || !years.every(year => quote.includes(year))) return false
+
+  const quarter = period.match(/\\bq([1-4])\\b/i)
+  if (quarter && !new RegExp('\\\\bq' + quarter[1] + '\\\\b|quarter\\\\s*' + quarter[1], 'i').test(quote)) return false
+
+  if (/\\bfy\\b|financial year/i.test(period) && !/\\bfy\\b|financial year|year ended/i.test(quote)) {
+    // Year-only disclosures can still support a fiscal-year label if the year itself is explicit.
+    return years.every(year => quote.includes(year))
+  }
+  return true
+}
+
 function verifiedEvidenceClaims(value: unknown, sources: Evidence[]): EvidenceClaim[] {
   if (!Array.isArray(value)) return []
   const claims: EvidenceClaim[] = []
@@ -668,7 +691,9 @@ function verifiedCalculations(value: unknown, sources: Evidence[]): Calculation[
       !unit ||
       !priorPeriod ||
       !currentPeriod ||
-      normalise(priorPeriod) === normalise(currentPeriod)
+      normalise(priorPeriod) === normalise(currentPeriod) ||
+      !periodIsSupported(priorPeriod, item.priorQuote) ||
+      !periodIsSupported(currentPeriod, item.currentQuote)
     ) continue
 
     const priorText = sources[priorIndex].content
@@ -877,9 +902,21 @@ Rules:
 
   const calculations = verifiedCalculations(result.calculationCandidates, sources)
   const evidence = verifiedEvidenceClaims(result.evidence, sources)
-  const whyItMatters = Array.isArray(result.whyItMatters)
+  const suppliedImplications = Array.isArray(result.whyItMatters)
     ? result.whyItMatters.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 5)
     : []
+  // Preserve the required 3–5 bullets without inventing company-specific facts.
+  // If the model returns too few, fill with explicit limitations rather than claims.
+  const requiredCaveats = [
+    'This interpretation is limited to the reporting periods and disclosures linked in the evidence trail.',
+    'The observed relationship does not by itself establish causation; compare peer and sector conditions.',
+    'Reconsider this conclusion if future comparable disclosures contradict the pattern described here.',
+  ]
+  const whyItMatters = [...suppliedImplications]
+  for (const caveat of requiredCaveats) {
+    if (whyItMatters.length >= 3) break
+    whyItMatters.push(caveat)
+  }
   const timeline: TimelineEvent[] = (Array.isArray(result.timeline) ? result.timeline : [])
     .slice(0, 8)
     .flatMap(value => {
@@ -925,15 +962,24 @@ Rules:
       ? rawConfidence
       : 'low'
 
-  // High confidence requires broad evidence and at least one source-checked calculation.
-  if (sources.length < 4 || calculations.length === 0) {
+  // Confidence reflects independent publisher diversity, not raw URL count alone.
+  const independentPublisherCount = new Set(sources.map(item => item.host)).size
+  const sourcedCounterargumentCount = counterarguments.filter(item => Boolean(item.sourceId)).length
+  if (independentPublisherCount < 3 || evidence.length < 2 || sourcedCounterargumentCount === 0) {
     if (confidence === 'high') confidence = 'medium'
   }
-  if (sources.length < 2 && confidence === 'medium') confidence = 'low'
+  if (independentPublisherCount < 2 || evidence.length === 0) confidence = 'low'
+  if (calculations.length === 0 && confidence === 'high') confidence = 'medium'
   const confidenceWasAdjusted =
     (rawConfidence === 'high' && confidence !== 'high') ||
     (rawConfidence === 'medium' && confidence === 'low')
-  const confidenceReason = text(result.confidenceReason)
+  const modelConfidenceReason = text(result.confidenceReason)
+  const confidenceReason = [
+    modelConfidenceReason,
+    `Validation summary: ${independentPublisherCount} distinct publishers, ${evidence.length} verified claim passages, ${calculations.length} verified calculations, and ${sourcedCounterargumentCount} source-linked counterarguments.`,
+    independentPublisherCount < 3 ? 'Publisher diversity is limited; different URLs may repeat the same underlying disclosure.' : '',
+    sourcedCounterargumentCount === 0 ? 'No counterargument was linked to a source, so alternative explanations remain weakly tested.' : '',
+  ].filter(Boolean).join(' ')
   const falsification = record(result.falsification)
   const response: InvestigationResponse = {
     mode: 'live',
