@@ -413,8 +413,22 @@ async function askGeminiForJson(
   )
 
   if (!response.ok) {
+    const errorPayload = await response.json().catch(() => null) as {
+      error?: { message?: string; status?: string; code?: number }
+    } | null
+    const providerMessage = typeof errorPayload?.error?.message === 'string'
+      ? errorPayload.error.message.replace(/\s+/g, ' ').slice(0, 300)
+      : ''
+    // Log only provider status/model and its short diagnostic. Never log prompts or secrets.
+    console.error('[SAKURA Gemini research] Provider request failed', {
+      httpStatus: response.status,
+      providerStatus: errorPayload?.error?.status,
+      model,
+      message: providerMessage || undefined,
+    })
+
     if (response.status === 401 || response.status === 403) {
-      throw new Error('Gemini authentication failed. Check GEMINI_API_KEY in Vercel Preview.')
+      throw new Error('Gemini authentication failed. Check GEMINI_API_KEY and Gemini API access for this project.')
     }
     if (response.status === 429) {
       throw new Error('Gemini rate or usage limit reached. Check the active Gemini model quota in Google AI Studio.')
@@ -422,7 +436,10 @@ async function askGeminiForJson(
     if (response.status === 404) {
       throw new Error(`Gemini could not find model "${model}". Set GEMINI_RESEARCH_MODEL to a model available in Google AI Studio.`)
     }
-    throw new Error(`Gemini research request failed (${response.status}). Check Google AI Studio and SAKURA environment settings.`)
+    if (response.status === 400) {
+      throw new Error(`Gemini rejected the research request (400)${providerMessage ? `: ${providerMessage}` : '. Check the model and JSON output settings.'}`)
+    }
+    throw new Error(`Gemini research request failed (${response.status})${providerMessage ? `: ${providerMessage}` : '. Check Google AI Studio and SAKURA environment settings.'}`)
   }
 
   const payload = (await response.json()) as {
