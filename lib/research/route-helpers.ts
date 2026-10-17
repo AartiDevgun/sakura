@@ -43,6 +43,7 @@ export function errorResponse(error: unknown) {
       message.startsWith('Groq could not find the configured model') ||
       message.startsWith('Groq rate or usage limit reached.') ||
       message.startsWith('Groq analysis request failed (') ||
+      message.startsWith('Groq request payload was too large (413).') ||
       message.startsWith('No usable public sources were found after trying fallback searches.') ||
       message.startsWith('Search results were returned, but none contained usable source text.') ||
       message.startsWith('Daily Groq analysis allowance reached.') ||
@@ -63,7 +64,8 @@ export function errorResponse(error: unknown) {
         message.startsWith('AI analysis failed') ||
         message.startsWith('Groq authentication failed') ||
         message.startsWith('Groq could not find the configured model') ||
-        message.startsWith('Groq analysis request failed')
+        message.startsWith('Groq analysis request failed') ||
+        message.startsWith('Groq request payload was too large')
       const quotaError = message.startsWith('Daily Groq analysis allowance reached') ||
         message.startsWith('Daily Tavily search allowance reached') ||
         message.startsWith('Groq rate or usage limit reached')
