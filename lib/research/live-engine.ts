@@ -623,13 +623,13 @@ function periodIsSupported(period: string, quote: string): boolean {
   const normalQuote = normalise(quote)
   if (normalQuote.includes(normalPeriod)) return true
 
-  const years = period.match(/(?:19|20)\\d{2}/g) ?? []
+  const years = period.match(/(?:19|20)\d{2}/g) ?? []
   if (years.length === 0 || !years.every(year => quote.includes(year))) return false
 
-  const quarter = period.match(/\\bq([1-4])\\b/i)
-  if (quarter && !new RegExp('\\\\bq' + quarter[1] + '\\\\b|quarter\\\\s*' + quarter[1], 'i').test(quote)) return false
+  const quarter = period.match(/\bq([1-4])\b/i)
+  if (quarter && !new RegExp('\\bq' + quarter[1] + '\\b|quarter\\s*' + quarter[1], 'i').test(quote)) return false
 
-  if (/\\bfy\\b|financial year/i.test(period) && !/\\bfy\\b|financial year|year ended/i.test(quote)) {
+  if (/\bfy\b|financial year/i.test(period) && !/\bfy\b|financial year|year ended/i.test(quote)) {
     // Year-only disclosures can still support a fiscal-year label if the year itself is explicit.
     return years.every(year => quote.includes(year))
   }
