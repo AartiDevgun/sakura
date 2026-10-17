@@ -23,14 +23,14 @@ export async function POST(request: Request) {
 
     // Match the provider selected by /api/research. Local sessions are stored
     // in Redis, so the follow-up must use the same local engine when configured.
-    if (process.env.TAVILY_API_KEY && process.env.GROQ_API_KEY) {
+    if (process.env.SAKURA_FORCE_MOCK !== 'true' && process.env.TAVILY_API_KEY && process.env.GROQ_API_KEY) {
       result = await liveInvestigation(
         body.data.company,
         body.data.angleId,
         request.signal,
         body.data.researchId,
       )
-    } else if (process.env.SIGNALFORGE_API_URL) {
+    } else if (process.env.SAKURA_FORCE_MOCK !== 'true' && process.env.SIGNALFORGE_API_URL) {
       result = await callBackend(
         '/investigations',
         body.data,
