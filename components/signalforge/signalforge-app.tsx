@@ -20,6 +20,7 @@ import { RequestError } from './request-error'
 import { ResearchTunnel } from './research-tunnel'
 import { JellyRadio } from './jelly-radio'
 import { ReportDashboard } from './report-dashboard'
+import { SakuraBuddy } from './sakura-buddy'
 
 const INTRO_HOLD_MS = 1100
 
@@ -291,6 +292,8 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
           </div>
         </div>
       ) : null}
+
+      {ready && !busy ? <SakuraBuddy /> : null}
     </>
   )
 }
