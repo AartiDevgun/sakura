@@ -459,7 +459,7 @@ async function askGeminiForJson(
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: 'application/json',
-          temperature: 0.2,
+          thinkingConfig: { thinkingLevel: 'low' },
           // Full research reports contain several source-linked arrays; 2,000 tokens can truncate the JSON.
           maxOutputTokens: 8192,
         },
@@ -568,7 +568,9 @@ async function askForJson(
     ANALYSIS_CACHE_TTL_SECONDS,
     async () => {
       const hasGemini = Boolean(process.env.GEMINI_API_KEY)
-      const useGeminiFirst = providerPreference === 'gemini' || !process.env.GROQ_API_KEY
+      // Groq stays primary whenever its API key is configured. The "gemini" preference
+      // enables Gemini as a fallback; it must not bypass Groq and make every run slower.
+      const useGeminiFirst = !process.env.GROQ_API_KEY
 
       if (providerPreference && providerPreference !== 'gemini' && providerPreference !== 'groq' && providerPreference !== 'auto') {
         throw new Error('Invalid SAKURA_RESEARCH_PROVIDER. Use auto, groq, or gemini.')
