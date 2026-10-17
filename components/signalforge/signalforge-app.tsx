@@ -200,7 +200,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
             </h1>
 
             <p className="mt-6 max-w-2xl text-pretty text-sm leading-7 text-rose-100/58 sm:text-base sm:leading-8">
-              SAKURA follows the evidence across filings, results, industry data and competitors—then challenges its own explanation before calling it a discovery.
+              SAKURA follows the evidence across filings, results, industry data and competitors, then challenges its own explanation before calling it a discovery.
             </p>
 
             <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
