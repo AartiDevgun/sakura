@@ -21,10 +21,10 @@ export async function POST(request: Request) {
     }
 
     const question = body.data.question.trim()
-    const normalizedQuestion = question.toLocaleLowerCase().replace(/\\s+/g, ' ')
+    const normalizedQuestion = question.toLocaleLowerCase().replace(/\s+/g, ' ')
     const answer = await cachedJson<string>(
       'gemini-chat-v1',
-      `${MODEL}\\0${normalizedQuestion}`,
+      JSON.stringify([MODEL, normalizedQuestion]),
       CHAT_TTL_SECONDS,
       async () => {
         const limit = Number.parseInt(process.env.SAKURA_GEMINI_DAILY_LIMIT ?? '30', 10)
