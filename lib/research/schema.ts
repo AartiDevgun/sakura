@@ -139,7 +139,7 @@ export const investigationResponseSchema = z.object({
     headline: z.string().min(1),
     summary: z.string().min(1),
     confidence: z.enum(['low', 'medium', 'high']),
-    whyItMatters: z.array(z.string()).max(5).optional(),
+    whyItMatters: z.array(z.string().min(1)).min(3).max(5),
     confidenceReason: z.string().optional(),
   }),
 

@@ -8,9 +8,10 @@ import { CounterargumentExplorer } from './counterargument-explorer'
 import { FollowupPanel } from './follow-up-panel'
 import { PeekRating } from './peek-rating'
 
-type SectionKey = 'discovery' | 'evidence' | 'numbers' | 'timeline' | 'challenge' | 'sources' | 'followup'
+type SectionKey = 'overview' | 'discovery' | 'evidence' | 'numbers' | 'timeline' | 'challenge' | 'sources' | 'followup'
 
 const SECTIONS: { id: SectionKey; label: string; icon: LucideIcon; note: string }[] = [
+  { id: 'overview', label: 'Full report', icon: BookOpen, note: 'All required outputs' },
   { id: 'discovery', label: 'Discovery', icon: Sparkles, note: 'The signal' },
   { id: 'evidence', label: 'Evidence trail', icon: Network, note: 'What supports it' },
   { id: 'numbers', label: 'Numbers', icon: ChartNoAxesCombined, note: 'Calculated changes' },
@@ -34,7 +35,7 @@ export function ReportDashboard({
   onExploreAngles: () => void
   onFollowupBusyChange: (busy: boolean) => void
 }) {
-  const [active, setActive] = useState<SectionKey>('discovery')
+  const [active, setActive] = useState<SectionKey>('overview')
   const [flipped, setFlipped] = useState(false)
   const reduce = useReducedMotion()
   const report = investigation.report
@@ -42,6 +43,7 @@ export function ReportDashboard({
   const selectedAngle = research.angles.find(angle => angle.id === investigation.angleId)
   const cited = new Set((report.evidence ?? []).map(item => item.sourceId))
   const primaryCount = report.sources.filter(source => source.sourceTier === 'primary').length
+  const independentPublisherCount = new Set(report.sources.map(source => { try { return new URL(source.url).hostname.replace(/^www\./, '').toLowerCase() } catch { return source.publisher?.toLowerCase() || source.id } })).size
   const confidenceLabel = discovery.confidence === 'high' ? 'Strong' : discovery.confidence === 'medium' ? 'Moderate' : 'Weak'
 
   return (
@@ -53,6 +55,7 @@ export function ReportDashboard({
           <p className="mt-1 text-sm text-rose-100/45">Banking, NBFCs & financial services · Public-evidence investigation</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <StatChip label="Angles tested" value={String(Math.min(research.angles.length, 3))} />
           <StatChip label="Sources" value={String(report.sources.length)} />
           <StatChip label="Primary" value={String(primaryCount)} />
           <StatChip label="Evidence strength" value={confidenceLabel} />
@@ -91,6 +94,75 @@ export function ReportDashboard({
       </div>
 
       <div id="sakura-report-panel" role="tabpanel" aria-labelledby={'sakura-tab-' + active} className="min-h-[350px] outline-none">
+        {active === 'overview' ? (
+          <div className="space-y-4">
+            <article className="rounded-3xl border border-pink-200/20 bg-gradient-to-br from-[#210b19]/85 via-[#0b080b]/95 to-black p-6 sm:p-8">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-pink-200/20 bg-pink-200/[0.07] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-pink-200">Track & company</span>
+                <span className="rounded-full border border-white/10 px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-rose-100/55">{confidenceLabel} evidence strength</span>
+              </div>
+              <p className="mt-3 text-xs text-rose-100/45">Track A · Banking, NBFCs & Financial Services · {research.company}</p>
+              <h3 className="mt-5 text-2xl font-semibold leading-tight text-rose-50 sm:text-4xl">{discovery.headline}</h3>
+              <p className="mt-4 text-sm leading-7 text-rose-100/70 sm:text-base">{discovery.summary}</p>
+              <p className="mt-4 text-xs leading-6 text-rose-100/45">Evidence strength rationale: {discovery.confidenceReason || 'The report has not supplied a specific confidence rationale; interpret the strength label cautiously.'}</p>
+            </article>
+
+            <ReportSection title="Why it matters" subtitle="Significance of the finding">
+              {discovery.whyItMatters && discovery.whyItMatters.length > 0 ? (
+                <ul className="space-y-2">{discovery.whyItMatters.slice(0, 5).map((item, index) => <li key={index} className="flex gap-3 text-sm leading-6 text-rose-100/70"><span className="text-pink-300">{String(index + 1).padStart(2, '0')}</span><span>{item}</span></li>)}</ul>
+              ) : <p className="text-sm text-amber-100/65">The model did not provide the required 3–5 implications. Treat the report as incomplete.</p>}
+            </ReportSection>
+
+            <ReportSection title="Evidence trail" subtitle="Claim → document → quoted passage">
+              {report.evidence && report.evidence.length > 0 ? <div className="space-y-3">{report.evidence.map((item, index) => {
+                const source = report.sources.find(candidate => candidate.id === item.sourceId)
+                return <div key={item.sourceId + '-overview-' + index} className="rounded-xl border border-pink-200/10 bg-black/30 p-4">
+                  <p className="text-sm font-medium text-rose-50">{item.claim}</p>
+                  <blockquote className="mt-2 border-l-2 border-pink-300/45 pl-3 text-xs leading-6 text-rose-100/60">“{item.quote}”</blockquote>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">{item.date ? <span className="text-[10px] text-rose-100/35">{item.date}</span> : null}{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-xs text-pink-300 underline underline-offset-4">{source.title} ↗</a> : <span className="text-xs text-amber-100/60">Source link unavailable</span>}</div>
+                </div>
+              })}</div> : <p className="text-sm text-amber-100/65">No source quotations passed verification. The discovery is not sufficiently traceable.</p>}
+            </ReportSection>
+
+            <ReportSection title="Timeline" subtitle="Verified changes in chronological order">
+              {report.timeline.length > 0 ? <div className="space-y-3">{[...report.timeline].sort((a, b) => { const yearA = Number(a.date.match(/(?:19|20)\d{2}/)?.[0] ?? 0); const yearB = Number(b.date.match(/(?:19|20)\d{2}/)?.[0] ?? 0); return yearA - yearB || Date.parse(a.date) - Date.parse(b.date) }).map((event, index) => {
+                const source = report.sources.find(candidate => candidate.id === event.sourceId)
+                return <div key={event.date + '-overview-' + index} className="rounded-xl border border-pink-200/10 bg-black/30 p-4">
+                  <p className="text-xs font-semibold text-pink-300">{event.date}</p><p className="mt-2 text-sm leading-6 text-rose-50/80">{event.event}</p>
+                  {event.quote ? <blockquote className="mt-2 border-l-2 border-pink-300/35 pl-3 text-xs leading-5 text-rose-100/50">“{event.quote}”</blockquote> : null}
+                  {source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs text-pink-300 underline underline-offset-4">{source.title} ↗</a> : null}
+                </div>
+              })}</div> : <p className="text-sm text-rose-100/50">No dated events passed verification. This is a data gap, not evidence that no change occurred.</p>}
+            </ReportSection>
+
+            <ReportSection title="Numbers" subtitle="Calculations used to substantiate the discovery">
+              {report.calculations.length > 0 ? <div className="space-y-3">{report.calculations.map((calc, index) => <div key={calc.label + '-overview-' + index} className="rounded-xl border border-pink-200/10 bg-black/30 p-4">
+                <p className="text-sm font-semibold text-rose-50">{calc.label}</p><p className="mt-2 text-2xl font-semibold text-pink-200">{calc.result}</p><p className="mt-2 font-mono text-xs leading-5 text-rose-100/50">{calc.formula}</p><p className="mt-2 text-sm leading-6 text-rose-100/60">{calc.interpretation}</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">{calc.inputs.map((input, i) => { const source = report.sources.find(candidate => candidate.id === input.sourceId); return <div key={input.name + i} className="rounded-lg border border-white/[0.07] p-3"><p className="text-[10px] uppercase tracking-wide text-rose-100/35">{input.name}</p><p className="mt-1 text-sm text-rose-50">{input.value}</p>{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs text-pink-300 underline underline-offset-4">{source.title} ↗</a> : <p className="mt-1 text-xs text-amber-100/60">Input source unavailable</p>}</div> })}</div>
+              </div>)}</div> : <p className="text-sm text-rose-100/50">No calculations passed validation. The report must not imply the metric stayed unchanged.</p>}
+            </ReportSection>
+
+            <ReportSection title="Counterargument" subtitle="The strongest alternative explanation">
+              {report.counterarguments.length > 0 ? <div className="space-y-3">{report.counterarguments.map((item, index) => { const source = report.sources.find(candidate => candidate.id === item.sourceId); return <div key={item.argument + index} className="rounded-xl border border-amber-200/10 bg-amber-950/10 p-4"><p className="text-sm font-semibold text-rose-50">{item.argument}</p><p className="mt-2 text-sm leading-6 text-rose-100/60">{item.assessment}</p>{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs text-pink-300 underline underline-offset-4">{source.title} ↗</a> : <p className="mt-2 text-xs text-amber-100/60">No linked source for this alternative; it is not independently substantiated.</p>}</div> })}</div> : <p className="text-sm text-amber-100/65">No counterargument was returned. This report is incomplete until a credible alternative explanation is tested.</p>}
+            </ReportSection>
+
+            <ReportSection title="Falsification condition" subtitle="What future evidence would make SAKURA reconsider">
+              <p className="text-sm leading-7 text-rose-50/80">{report.falsification.condition}</p>
+              {report.falsification.metric ? <p className="mt-2 text-xs text-rose-100/50">Metric to monitor: {report.falsification.metric}</p> : null}
+              {report.falsification.checkBy ? <p className="mt-1 text-xs text-rose-100/50">Reassess by: {report.falsification.checkBy}</p> : null}
+            </ReportSection>
+
+            <ReportSection title="Source independence & coverage" subtitle="Different links do not always mean independent evidence">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <StatChip label="Documents" value={String(report.sources.length)} />
+                <StatChip label="Distinct publishers" value={String(independentPublisherCount)} />
+                <StatChip label="Primary sources" value={String(primaryCount)} />
+              </div>
+              <p className="mt-3 text-xs leading-6 text-rose-100/45">Publisher diversity is a proxy, not proof of independence. Check whether sources repeat the same original announcement and review the source ledger for provenance.</p>
+              <div className="mt-3 space-y-2">{report.sources.map((source, index) => <a key={source.id + '-overview-source'} href={source.url} target="_blank" rel="noopener noreferrer" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/[0.07] p-3 text-xs text-rose-100/70 hover:border-pink-200/25"><span>{source.title}</span><span className="text-pink-300">{source.sourceTier || 'tier unknown'} · {source.publisher || 'publisher unknown'} ↗</span></a>)}</div>
+            </ReportSection>
+          </div>
+        ) : null}
         {active === 'discovery' ? (
           <div className="space-y-4">
             <div className="perspective-[1400px]">
@@ -288,6 +360,11 @@ export function ReportDashboard({
       </div>
     </section>
   )
+}
+
+
+function ReportSection({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+  return <section className="rounded-2xl border border-pink-200/12 bg-black/40 p-5 sm:p-6"><div className="mb-4"><h3 className="text-lg font-semibold text-rose-50">{title}</h3><p className="mt-1 text-xs leading-5 text-rose-100/40">{subtitle}</p></div>{children}</section>
 }
 
 function StatChip({ label, value }: { label: string; value: string }) {
