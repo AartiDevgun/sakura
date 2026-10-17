@@ -208,25 +208,58 @@ function isUsableSearchResult(item: SearchResult): boolean {
   }
 }
 
+function isRatingAgencyHost(host: string): boolean {
+  return matchesDomain(host, [
+    'crisil.com',
+    'icra.in',
+    'careedge.in',
+    'indiaratings.co.in',
+    'brickworkratings.com',
+    'infomerics.com',
+    'acuite.in',
+  ])
+}
+
+function isRatingRationale(item: Pick<Evidence, 'host' | 'source'>): boolean {
+  return isRatingAgencyHost(item.host) ||
+    /rating\s+(?:action\s+)?rationale|credit\s+rating\s+(?:rationale|report)/i.test(item.source.title)
+}
+
+function sourceQualityScore(item: Evidence): number {
+  const textCorpus = `${item.source.title} ${item.content.slice(0, 1600)}`
+  const primary = item.source.sourceTier === 'primary'
+  const secondary = item.source.sourceTier === 'secondary'
+  const rating = isRatingRationale(item)
+  const documentLed = /annual report|quarterly results|financial results|investor presentation|integrated filing|exchange filing|financial statements|balance sheet|cash flow statement|regulatory filing/i.test(item.source.title)
+  const hasFinancialFigures = /(?:₹|\bINR\b|\bRs\.?\b|crore|lakh|million|billion|gross NPA|net NPA|capital adequacy|assets under management|AUM|net interest income|provision)/i.test(textCorpus)
+  const nonRatingNews = item.source.sourceType === 'financial_media' && !rating
+
+  return item.score +
+    (primary ? 2.2 : secondary ? 0.25 : 0) +
+    (documentLed ? 0.55 : 0) +
+    (hasFinancialFigures ? 0.25 : 0) +
+    (nonRatingNews ? 0.3 : 0) -
+    (rating ? 1.5 : 0)
+}
+
 async function collectEvidence(
   company: string,
   angle?: string,
   signal?: AbortSignal,
 ): Promise<Evidence[]> {
-  // Normally one query is enough. Additional queries run only when results are empty/unusable,
-  // and every actual provider request remains behind the shared daily budget guard.
-  // Search narrowly first, then broaden only when the returned results are unusable.
-  // This keeps normal requests quota-efficient while making transient/empty searches recoverable.
+  // Pull separate result pools for filings, financial statements, and independent coverage.
+  // Never stop just because the first query returns pages: that was allowing rating rationales
+  // to dominate source selection for financial-services companies.
   const queries = angle
     ? [
         `"${company}" ${angle}`,
-        `"${company}" quarterly financial results annual report investor relations`,
-        `${company} exchange filing annual report financial results`,
+        `"${company}" NSE BSE exchange filing quarterly financial results investor presentation ${angle}`,
       ]
     : [
-        `"${company}" latest quarterly financial results annual report investor relations`,
-        `${company} annual report financial statements quarterly results`,
-        `${company} official investor relations exchange filing earnings`,
+        `"${company}" latest quarterly financial results official investor presentation`,
+        `"${company}" NSE BSE exchange filing annual report financial statements`,
+        `"${company}" annual report balance sheet cash flow statement financial results`,
+        `"${company}" joint venture partners subsidiaries regulatory filing RBI SEBI`,
       ]
 
   const candidates: SearchResult[] = []
@@ -235,33 +268,29 @@ async function collectEvidence(
   for (const query of queries) {
     try {
       const batch = await searchWeb(query, signal)
-      const usable = batch.filter(isUsableSearchResult)
-      if (usable.length > 0) {
-        candidates.push(...usable)
-        break
-      }
+      candidates.push(...batch.filter(isUsableSearchResult))
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') throw error
       const searchError = error instanceof Error ? error : new Error('Public web search failed.')
       searchErrors.push(searchError)
 
-      // A quota or configuration issue will not improve by issuing more fresh searches.
+      // Quota/configuration errors will not improve with more fresh queries.
       if (
         /daily tavily search (?:allowance|limit) reached|usage protection is unavailable|missing environment variable: tavily_api_key/i.test(searchError.message)
       ) break
     }
   }
 
-  if (candidates.length === 0) {
-    // Cache-only recovery is safe when the live provider is unavailable or results are empty.
+  // Cache-only recovery: use old query variants if fresh search was empty or budget-limited.
+  if (candidates.length < 5) {
     const legacyQueries = angle
       ? [
           `"${company}" ${angle} annual report financial results`,
-          `${company} ${angle} investor presentation exchange filing competitor industry trend`,
+          `"${company}" ${angle} investor presentation exchange filing`,
         ]
       : [
-          `${company} annual report latest quarterly financial results investor presentation`,
-          `${company} margins working capital revenue segments competitors industry trends`,
+          `"${company}" annual report latest quarterly financial results investor presentation`,
+          `"${company}" official financial statements results filings partners subsidiaries`,
         ]
     const cached = await Promise.all([...queries, ...legacyQueries].map(cachedSearchOnly))
     candidates.push(...cached.flat().filter(isUsableSearchResult))
@@ -271,11 +300,10 @@ async function collectEvidence(
     throw searchErrors[0]
   }
   if (candidates.length === 0) {
-    throw new Error('No usable public sources were found after trying fallback searches. Try the company’s full legal name or ticker.')
+    throw new Error('No usable public sources were found after trying targeted searches. Try the company’s full legal name or ticker.')
   }
 
   const unique = new Map<string, Evidence>()
-
   for (const item of candidates) {
     if (!item.url || !item.title) continue
 
@@ -293,23 +321,12 @@ async function collectEvidence(
     }
 
     const canonicalUrl = url.toString()
-    const content = text(item.raw_content, text(item.content))
-    if (!content) continue
+    const sourceText = text(item.raw_content, text(item.content))
+    if (!sourceText) continue
 
     const host = url.hostname.toLowerCase().replace(/^www\./, '')
     const classification = classifySource(host)
-    const score =
-      (typeof item.score === 'number' ? item.score : 0) +
-      (classification.sourceTier === 'primary'
-        ? 0.3
-        : classification.sourceTier === 'secondary'
-          ? 0.1
-          : 0)
-
-    const current = unique.get(canonicalUrl)
-    if (current && current.score >= score) continue
-
-    unique.set(canonicalUrl, {
+    const evidenceItem: Evidence = {
       source: {
         id: '',
         title: item.title.trim().slice(0, 300),
@@ -320,23 +337,31 @@ async function collectEvidence(
         sourceType: classification.sourceType,
         sourceTier: classification.sourceTier,
       },
-      content: content.slice(0, 4500),
-      score,
+      content: sourceText.slice(0, 4500),
+      score: typeof item.score === 'number' ? item.score : 0,
       host,
-    })
+    }
+    const current = unique.get(canonicalUrl)
+    if (!current || sourceQualityScore(evidenceItem) > sourceQualityScore(current)) {
+      unique.set(canonicalUrl, evidenceItem)
+    }
   }
 
-  // Rank by search relevance and provenance, while limiting host dominance.
-  const ranked = [...unique.values()].sort((a, b) => b.score - a.score)
+  // Diversity safeguards: prefer original financial statements/filings, allow at most one
+  // rating-agency rationale, and prevent any one publisher from filling the source ledger.
+  const ranked = [...unique.values()].sort((a, b) => sourceQualityScore(b) - sourceQualityScore(a))
   const results: Evidence[] = []
   const hostCounts = new Map<string, number>()
+  let ratingCount = 0
 
   for (const item of ranked) {
-    const count = hostCounts.get(item.host) ?? 0
-    if (count >= 2) continue
+    const hostCount = hostCounts.get(item.host) ?? 0
+    const rating = isRatingRationale(item)
+    if (hostCount >= 2 || (rating && ratingCount >= 1)) continue
 
     results.push(item)
-    hostCounts.set(item.host, count + 1)
+    hostCounts.set(item.host, hostCount + 1)
+    if (rating) ratingCount += 1
     if (results.length >= 10) break
   }
 
@@ -345,7 +370,7 @@ async function collectEvidence(
   })
 
   if (results.length === 0) {
-    throw new Error('Search results were returned, but none contained usable source text. Try the company’s full legal name or ticker.')
+    throw new Error('Search returned pages, but none contained usable independent source text.')
   }
 
   return results
