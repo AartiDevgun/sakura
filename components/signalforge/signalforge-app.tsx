@@ -33,7 +33,7 @@ type Flow =
   | { step: 'angles'; research: ResearchResponse }
   | { step: 'investigating'; research: ResearchResponse; angleId: string }
   | { step: 'investigation-error'; research: ResearchResponse; angleId: string; message: string }
-  | { step: 'result'; research: ResearchResponse; investigation: InvestigationResponse }
+  | { step: 'result'; research: ResearchResponse; investigation: InvestigationResponse; discoveries: InvestigationResponse[] }
 
 export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
   const [intro, setIntro] = useState<IntroPhase>('intro')
@@ -128,7 +128,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
       }
 
       const ranked = [...candidates].sort((a, b) => scoreInvestigation(b) - scoreInvestigation(a))
-      setFlow({ step: 'result', research, investigation: ranked[0] })
+      setFlow({ step: 'result', research, investigation: ranked[0], discoveries: ranked })
     } catch (error) {
       if (isAbortError(error)) return
       setFlow({ step: 'research-error', company, message: (error as Error).message })
@@ -145,7 +145,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
         investigationResponseSchema,
         { signal, mockScenario },
       )
-      setFlow({ step: 'result', research, investigation })
+      setFlow({ step: 'result', research, investigation, discoveries: [investigation] })
     } catch (error) {
       if (isAbortError(error)) return
       setFlow({ step: 'investigation-error', research, angleId, message: (error as Error).message })
@@ -293,7 +293,13 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
           <ReportDashboard
             research={flow.research}
             investigation={flow.investigation}
+            discoveries={flow.discoveries}
             backendMode={backendMode}
+            onSelectDiscovery={angleId => setFlow(current =>
+              current.step === 'result'
+                ? { ...current, investigation: current.discoveries.find(item => item.angleId === angleId) || current.investigation }
+                : current
+            )}
             onExploreAngles={() => setFlow({ step: 'angles', research: flow.research })}
             onFollowupBusyChange={setFollowupBusy}
           />
