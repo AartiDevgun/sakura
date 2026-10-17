@@ -413,6 +413,9 @@ async function askForJson(
       })
 
       if (!response.ok) {
+        if (response.status === 413) {
+          throw new Error('Groq request payload was too large (413). SAKURA has reduced its source excerpts; try again, or use a shorter research angle. ')
+        }
         if (response.status === 401 || response.status === 403) {
           throw new Error('Groq authentication failed. Check GROQ_API_KEY in the Vercel environment used by this deployment, then redeploy.')
         }
@@ -860,8 +863,9 @@ Rules:
 - Return 4-6 evidence items when the excerpts support them. Aim for at least four genuinely distinct observations; return fewer only when the evidence does not support more.
 - Each evidence item must add a separate material fact or disclosure, not repeat or lightly rephrase the headline or another item. Prefer different source documents and business dimensions when available.
 - Every evidence quote must be copied verbatim from the supplied excerpts and be at least 15 characters long. The application will independently verify each quote and will display an observation only when the quote matches retrieved source text.
-- Include calculations only when both figures, comparable units and distinct reporting periods are present in the exact source quotations; the application independently calculates the result.
-- Include the stated unit in both calculation quotations. If values or units are missing or incomparable, return an empty calculationCandidates array.
+- Actively look for 1-3 useful calculations before returning an empty calculationCandidates array. Check for comparable values across periods, including revenue, deposits, advances, profit, margins, NPAs and capital ratios when relevant.
+- Include a calculation only when both figures, comparable units and distinct reporting periods are present in exact source quotations; the application independently calculates the result. Never infer a missing value.
+- Copy enough of each source sentence into priorQuote and currentQuote to preserve the exact number, unit and reporting period. Accept equivalent unit wording only when the source itself supports it. If values or units are missing or incomparable, return an empty calculationCandidates array.
 - Every timeline event must include an exact source quotation that contains the date or reporting period and supports the event. The application independently checks the quotation and date against retrieved source text.
 - Use only dates/period labels explicitly present in the quoted source passage. Omit timeline items whose date cannot be tied to an exact quote; never estimate or infer a date.
 - Include real counterarguments, not straw men.
