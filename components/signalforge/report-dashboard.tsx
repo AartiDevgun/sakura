@@ -9,6 +9,7 @@ import { FollowupPanel } from './follow-up-panel'
 import { PeekRating } from './peek-rating'
 import { JellyRadio } from './jelly-radio'
 import { DiscoveryFlipCard } from './discovery-flip-card'
+import { ParagraphText } from './paragraph-text'
 
 type SectionKey = 'overview' | 'discovery' | 'evidence' | 'numbers' | 'timeline' | 'challenge' | 'sources' | 'followup'
 
@@ -145,7 +146,7 @@ export function ReportDashboard({
               {report.timeline.length > 0 ? <div className="space-y-3">{[...report.timeline].sort((a, b) => { const yearA = Number(a.date.match(/(?:19|20)\d{2}/)?.[0] ?? 0); const yearB = Number(b.date.match(/(?:19|20)\d{2}/)?.[0] ?? 0); return yearA - yearB || Date.parse(a.date) - Date.parse(b.date) }).map((event, index) => {
                 const source = report.sources.find(candidate => candidate.id === event.sourceId)
                 return <div key={event.date + '-overview-' + index} className="rounded-xl border border-pink-200/10 bg-black/30 p-4">
-                  <p className="text-xs font-semibold text-pink-300">{event.date}</p><p className="mt-2 text-sm leading-6 text-rose-50/80">{event.event}</p>
+                  <p className="text-xs font-semibold text-pink-300">{event.date}</p><ParagraphText text={event.event} className="mt-2 space-y-2 text-sm leading-6 text-rose-50/80" paragraphClassName="" />
                   {event.quote ? <blockquote className="mt-2 border-l-2 border-pink-300/35 pl-3 text-xs leading-5 text-rose-100/50">“{event.quote}”</blockquote> : null}
                   {source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs text-pink-300 underline underline-offset-4">{source.title} ↗</a> : null}
                 </div>
@@ -154,13 +155,13 @@ export function ReportDashboard({
 
             <ReportSection title="Numbers" subtitle="Calculations used to substantiate the discovery">
               {report.calculations.length > 0 ? <div className="space-y-3">{report.calculations.map((calc, index) => <div key={calc.label + '-overview-' + index} className="rounded-xl border border-pink-200/10 bg-black/30 p-4">
-                <p className="text-sm font-semibold text-rose-50">{calc.label}</p><p className="mt-2 text-2xl font-semibold text-pink-200">{calc.result}</p><p className="mt-2 font-mono text-xs leading-5 text-rose-100/50">{calc.formula}</p><p className="mt-2 text-sm leading-6 text-rose-100/60">{calc.interpretation}</p>
+                <p className="text-sm font-semibold text-rose-50">{calc.label}</p><p className="mt-2 text-2xl font-semibold text-pink-200">{calc.result}</p><p className="mt-2 font-mono text-xs leading-5 text-rose-100/50">{calc.formula}</p><ParagraphText text={calc.interpretation} className="mt-2 space-y-2 text-sm leading-6 text-rose-100/60" paragraphClassName="" />
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">{calc.inputs.map((input, i) => { const source = report.sources.find(candidate => candidate.id === input.sourceId); return <div key={input.name + i} className="rounded-lg border border-white/[0.07] p-3"><p className="text-[10px] uppercase tracking-wide text-rose-100/35">{input.name}</p><p className="mt-1 text-sm text-rose-50">{input.value}</p>{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs text-pink-300 underline underline-offset-4">{source.title} ↗</a> : <p className="mt-1 text-xs text-amber-100/60">Input source unavailable</p>}</div> })}</div>
               </div>)}</div> : <p className="text-sm text-rose-100/50">No calculations passed validation. The report must not imply the metric stayed unchanged.</p>}
             </ReportSection>
 
             <ReportSection title="Counterargument" subtitle="The strongest alternative explanation">
-              {report.counterarguments.length > 0 ? <div className="space-y-3">{report.counterarguments.map((item, index) => { const source = report.sources.find(candidate => candidate.id === item.sourceId); return <div key={item.argument + index} className="rounded-xl border border-amber-200/10 bg-amber-950/10 p-4"><p className="text-sm font-semibold text-rose-50">{item.argument}</p><p className="mt-2 text-sm leading-6 text-rose-100/60">{item.assessment}</p>{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs text-pink-300 underline underline-offset-4">{source.title} ↗</a> : <p className="mt-2 text-xs text-amber-100/60">No linked source for this alternative; it is not independently substantiated.</p>}</div> })}</div> : <p className="text-sm text-amber-100/65">No counterargument was returned. This report is incomplete until a credible alternative explanation is tested.</p>}
+              {report.counterarguments.length > 0 ? <div className="space-y-3">{report.counterarguments.map((item, index) => { const source = report.sources.find(candidate => candidate.id === item.sourceId); return <div key={item.argument + index} className="rounded-xl border border-amber-200/10 bg-amber-950/10 p-4"><p className="text-sm font-semibold text-rose-50">{item.argument}</p><ParagraphText text={item.assessment} className="mt-2 space-y-2 text-sm leading-6 text-rose-100/60" paragraphClassName="" />{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs text-pink-300 underline underline-offset-4">{source.title} ↗</a> : <p className="mt-2 text-xs text-amber-100/60">No linked source for this alternative; it is not independently substantiated.</p>}</div> })}</div> : <p className="text-sm text-amber-100/65">No counterargument was returned. This report is incomplete until a credible alternative explanation is tested.</p>}
             </ReportSection>
 
             <ReportSection title="Falsification condition" subtitle="What future evidence would make SAKURA reconsider">
@@ -214,7 +215,7 @@ export function ReportDashboard({
                 <p className="text-sm font-semibold text-rose-50">{calc.label}</p>
                 <p className="mt-3 text-3xl font-semibold tracking-tight text-pink-200">{calc.result}</p>
                 <p className="mt-2 rounded-lg bg-white/[0.035] px-3 py-2 font-mono text-xs leading-5 text-rose-100/50">{calc.formula}</p>
-                <p className="mt-3 text-sm leading-6 text-rose-100/65">{calc.interpretation}</p>
+                <ParagraphText text={calc.interpretation} className="mt-3 space-y-2 text-sm leading-6 text-rose-100/65" paragraphClassName="" />
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
                   {calc.inputs.map((input, i) => {
                     const source = report.sources.find(candidate => candidate.id === input.sourceId)
