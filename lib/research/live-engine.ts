@@ -941,6 +941,14 @@ Rules:
         quote,
       }]
     })
+    .sort((a, b) => {
+      const yearA = Number(a.date.match(/(?:19|20)\d{2}/)?.[0] ?? 0)
+      const yearB = Number(b.date.match(/(?:19|20)\d{2}/)?.[0] ?? 0)
+      if (yearA !== yearB) return yearA - yearB
+      const dateA = Date.parse(a.date)
+      const dateB = Date.parse(b.date)
+      return Number.isFinite(dateA) && Number.isFinite(dateB) ? dateA - dateB : 0
+    })
 
   const counterarguments: Counterargument[] = (
     Array.isArray(result.counterarguments) ? result.counterarguments : []
