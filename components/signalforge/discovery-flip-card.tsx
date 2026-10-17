@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { ArrowLeft, ArrowUpRight, CheckCircle2 } from 'lucide-react'
 import type { InvestigationResponse } from '@/lib/research/schema'
+import { ParagraphText } from './paragraph-text'
 
 interface DiscoveryFlipCardProps {
   company: string
@@ -38,7 +39,7 @@ export function DiscoveryFlipCard({ company, discovery, report }: DiscoveryFlipC
               <span className="rounded-full border border-white/10 px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-rose-100/55">{strength} evidence strength</span>
             </div>
             <h3 className="mt-6 text-pretty text-2xl font-semibold leading-tight tracking-tight text-rose-50 sm:text-4xl">{discovery.headline}</h3>
-            <p className="mt-4 max-w-3xl text-sm leading-7 text-rose-100/70 sm:text-base">{discovery.summary}</p>
+            <ParagraphText text={discovery.summary} className="mt-4 max-w-3xl space-y-3 text-sm leading-7 text-rose-100/70 sm:text-base" paragraphClassName="" />
             <p className="mt-4 text-xs leading-6 text-rose-100/45">Evidence-led finding, not an investment recommendation. Review the reasoning and source trail before relying on it.</p>
             <div className="mt-auto flex flex-wrap items-end justify-between gap-4 pt-7">
               <p className="text-xs text-rose-100/35">{report.sources.length} source link{report.sources.length === 1 ? '' : 's'} · {report.calculations.length} calculated metric{report.calculations.length === 1 ? '' : 's'}</p>
@@ -56,7 +57,7 @@ export function DiscoveryFlipCard({ company, discovery, report }: DiscoveryFlipC
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-pink-300/75">What the evidence supports</p>
               <span className="text-xs text-rose-100/35">Reasoning · {strength}</span>
             </div>
-            <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-rose-100/75">{report.thesis}</p>
+            <ParagraphText text={report.thesis} className="mt-4 space-y-3 text-sm leading-7 text-rose-100/75" paragraphClassName="" />
             <h4 className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-pink-200/75">Why it matters</h4>
             <ul className="mt-2 space-y-2">
               {discovery.whyItMatters.slice(0, 5).map((item, index) => (
