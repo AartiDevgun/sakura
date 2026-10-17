@@ -383,15 +383,18 @@ function mergeEvidence(existing: Evidence[], fresh: Evidence[]): Evidence[] {
     if (!current || item.score > current.score) unique.set(item.source.url, item)
   }
 
-  const ranked = [...unique.values()].sort((a, b) => b.score - a.score)
+  const ranked = [...unique.values()].sort((a, b) => sourceQualityScore(b) - sourceQualityScore(a))
   const results: Evidence[] = []
   const hostCounts = new Map<string, number>()
+  let ratingCount = 0
 
   for (const item of ranked) {
     const count = hostCounts.get(item.host) ?? 0
-    if (count >= 2) continue
+    const rating = isRatingRationale(item)
+    if (count >= 2 || (rating && ratingCount >= 1)) continue
     results.push(item)
     hostCounts.set(item.host, count + 1)
+    if (rating) ratingCount += 1
     if (results.length >= 12) break
   }
 
@@ -1197,11 +1200,11 @@ Rules:
     .map(claim => sources.find(source => source.source.id === claim.sourceId))
     .filter((source): source is Evidence => Boolean(source))
   const evidencePublisherCount = new Set(citedEvidenceSources.map(source => source.host)).size
-  const primaryCitedSourceCount = new Set(
-    citedEvidenceSources.filter(source => source.source.sourceTier === 'primary').map(source => source.host),
+  const primaryCitedDocumentCount = new Set(
+    citedEvidenceSources.filter(source => source.source.sourceTier === 'primary').map(source => source.source.id),
   ).size
   const sourcedCounterargumentCount = counterarguments.filter(item => Boolean(item.sourceId)).length
-  if (independentPublisherCount < 3 || evidencePublisherCount < 3 || evidence.length < 3 || sourcedCounterargumentCount === 0 || primaryCitedSourceCount < 2) {
+  if (independentPublisherCount < 3 || evidencePublisherCount < 3 || evidence.length < 3 || sourcedCounterargumentCount === 0 || primaryCitedDocumentCount < 2) {
     if (confidence === 'high') confidence = 'medium'
   }
   if (independentPublisherCount < 2 || evidencePublisherCount < 2 || evidence.length < 2) confidence = 'low'
@@ -1212,9 +1215,9 @@ Rules:
   const modelConfidenceReason = text(result.confidenceReason)
   const confidenceReason = [
     modelConfidenceReason,
-    `Validation summary: ${independentPublisherCount} distinct publishers retrieved; ${evidencePublisherCount} distinct publishers in verified claim passages; ${primaryCitedSourceCount} primary-disclosure publishers cited; ${evidence.length} verified passages; ${calculations.length} verified calculations; and ${sourcedCounterargumentCount} source-linked counterarguments.`,
+    `Validation summary: ${independentPublisherCount} distinct publishers retrieved; ${evidencePublisherCount} distinct publishers in verified claim passages; ${primaryCitedDocumentCount} primary-disclosure documents cited; ${evidence.length} verified passages; ${calculations.length} verified calculations; and ${sourcedCounterargumentCount} source-linked counterarguments.`,
     independentPublisherCount < 3 || evidencePublisherCount < 3 ? 'Publisher diversity is limited; different URLs may repeat the same underlying disclosure.' : '',
-    primaryCitedSourceCount < 2 ? 'Fewer than two primary-disclosure publishers were linked to verified claims; review the original exchange filings and company results before trusting a strong conclusion.' : '',
+    primaryCitedSourceCount < 2 ? 'Fewer than two primary-disclosure documents were linked to verified claims; review the original exchange filings and company results before trusting a strong conclusion.' : '',
     sourcedCounterargumentCount === 0 ? 'No counterargument was linked to a source, so alternative explanations remain weakly tested.' : '',
   ].filter(Boolean).join(' ')
   const falsification = record(result.falsification)
