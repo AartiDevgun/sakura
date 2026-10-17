@@ -48,6 +48,7 @@ export function errorResponse(error: unknown) {
       message.startsWith('Gemini could not process the research prompt.') ||
       message.startsWith('Gemini returned an empty research response.') ||
       message.startsWith('Gemini returned invalid JSON.') ||
+      message.startsWith('Gemini stopped before completing the report JSON') ||
       message.startsWith('Gemini rejected the chat request.') ||
       message.startsWith('Gemini rate or usage limit reached.') ||
       message.startsWith('Gemini chat request failed (') ||
@@ -81,6 +82,7 @@ export function errorResponse(error: unknown) {
         message.startsWith('Gemini could not process the research prompt') ||
         message.startsWith('Gemini returned an empty research response') ||
         message.startsWith('Gemini returned invalid JSON') ||
+        message.startsWith('Gemini stopped before completing the report JSON') ||
         message.startsWith('Gemini rejected the chat request') ||
         message.startsWith('Gemini chat request failed') ||
         message.startsWith('Gemini request payload was too large') ||
