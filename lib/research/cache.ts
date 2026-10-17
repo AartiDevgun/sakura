@@ -173,6 +173,11 @@ export async function consumeDailyBudget(
         'Daily Groq analysis allowance reached. It resets at 05:30 IST. Increase SAKURA_GROQ_DAILY_LIMIT in Vercel Preview only within your Groq plan limits, or retry after reset.',
       )
     }
+    if (provider === 'gemini') {
+      throw new Error(
+        'Daily Gemini analysis allowance reached. It resets at 05:30 IST. Increase SAKURA_GEMINI_DAILY_LIMIT in Vercel Preview only within your Google AI plan limits, or retry after reset.',
+      )
+    }
     throw new Error(
       'Daily Tavily search allowance reached. It resets at 05:30 IST. Increase SAKURA_TAVILY_DAILY_LIMIT in Vercel Preview only within your Tavily plan limits, or retry after reset.',
     )
