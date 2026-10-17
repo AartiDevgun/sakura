@@ -74,16 +74,61 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
     abortRef.current = null
   }
 
+  const scoreInvestigation = (investigation: InvestigationResponse) => {
+    const report = investigation.report
+    const independentPublishers = new Set(
+      report.sources.map(source => {
+        try { return new URL(source.url).hostname.replace(/^www\./, '').toLowerCase() }
+        catch { return source.publisher?.toLowerCase() || source.id }
+      }),
+    ).size
+    const confidenceScore = investigation.discovery.confidence === 'high' ? 3 : investigation.discovery.confidence === 'medium' ? 2 : 1
+    const verifiedClaims = report.evidence?.length ?? 0
+    const sourcedCounterarguments = report.counterarguments.filter(item => Boolean(item.sourceId)).length
+    return confidenceScore + Math.min(verifiedClaims, 5) + Math.min(independentPublishers, 4) +
+      report.calculations.length * 2 + Math.min(report.timeline.length, 3) * 0.5 +
+      sourcedCounterarguments * 0.75
+  }
+
   const runResearch = async (company: string) => {
     const signal = startRequest()
     setFlow({ step: 'researching', company })
     try {
       const research = await postJson('/api/research', { company }, researchResponseSchema, { signal, mockScenario })
-      if (research.angles.length > 0) {
-        await runInvestigation(research, research.angles[0].id)
-      } else {
+      if (research.angles.length === 0) {
         setFlow({ step: 'angles', research })
+        return
       }
+
+      // Test up to three candidate angles instead of assuming the first model-ranked
+      // hypothesis is the strongest. Each candidate still passes the same validators.
+      const candidates: InvestigationResponse[] = []
+      const errors: string[] = []
+      const anglesToTest = research.angles.slice(0, 3)
+      for (let index = 0; index < anglesToTest.length; index += 1) {
+        const angle = anglesToTest[index]
+        setFlow({ step: 'investigating', research, angleId: angle.id })
+        try {
+          const investigation = await postJson(
+            '/api/research/investigate',
+            { researchId: research.researchId, company: research.company, angleId: angle.id },
+            investigationResponseSchema,
+            { signal, mockScenario },
+          )
+          candidates.push(investigation)
+        } catch (error) {
+          if (isAbortError(error)) return
+          errors.push((error as Error).message)
+        }
+      }
+
+      if (candidates.length === 0) {
+        setFlow({ step: 'investigation-error', research, angleId: anglesToTest[0].id, message: errors[0] || 'No candidate angle could be investigated.' })
+        return
+      }
+
+      const ranked = [...candidates].sort((a, b) => scoreInvestigation(b) - scoreInvestigation(a))
+      setFlow({ step: 'result', research, investigation: ranked[0] })
     } catch (error) {
       if (isAbortError(error)) return
       setFlow({ step: 'research-error', company, message: (error as Error).message })
