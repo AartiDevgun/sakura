@@ -444,26 +444,57 @@ async function askGeminiForJson(
   }
 
   const payload = (await response.json()) as {
-    candidates?: { content?: { parts?: { text?: string | null }[] } }[]
+    candidates?: {
+      content?: { parts?: { text?: string | null }[] }
+      finishReason?: string
+    }[]
     promptFeedback?: { blockReason?: string }
   }
-  const content = payload.candidates?.[0]?.content?.parts
+  const candidate = payload.candidates?.[0]
+  const rawContent = candidate?.content?.parts
     ?.map(part => part.text ?? '')
     .join('')
     .trim()
 
-  if (!content) {
+  if (!rawContent) {
     if (payload.promptFeedback?.blockReason) {
       throw new Error('Gemini could not process the research prompt. Try again with a narrower research angle.')
+    }
+    if (candidate?.finishReason === 'MAX_TOKENS') {
+      throw new Error('Gemini stopped before completing the report JSON because it reached the output-token limit. Retry with a narrower research angle.')
     }
     throw new Error('Gemini returned an empty research response.')
   }
 
-  try {
-    return record(JSON.parse(content))
-  } catch {
-    throw new Error('Gemini returned invalid JSON. Please retry.')
+  // Accept a valid object even if the provider adds a Markdown fence or preamble.
+  const fence = String.fromCharCode(96).repeat(3)
+  const unfenced = rawContent.replace(new RegExp('^\\s*' + fence + '(?:json)?\\s*', 'i'), '').replace(new RegExp('\\s*' + fence + '\\s*$'), '').trim()
+  const firstBrace = unfenced.indexOf('{')
+  const lastBrace = unfenced.lastIndexOf('}')
+  const jsonCandidates = [unfenced]
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    const extracted = unfenced.slice(firstBrace, lastBrace + 1)
+    if (extracted !== unfenced) jsonCandidates.push(extracted)
   }
+  for (const candidateJson of jsonCandidates) {
+    try {
+      const parsed: unknown = JSON.parse(candidateJson)
+      if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as JsonObject
+      }
+    } catch {
+      // Continue to the next strict JSON candidate.
+    }
+  }
+  if (candidate?.finishReason === 'MAX_TOKENS') {
+    throw new Error('Gemini stopped before completing the report JSON because it reached the output-token limit. Retry with a narrower research angle.')
+  }
+  console.error('[SAKURA Gemini research] Model response was not valid JSON', {
+    model,
+    outputCharacters: rawContent.length,
+    finishReason: candidate?.finishReason ?? 'unknown',
+  })
+  throw new Error('Gemini returned invalid JSON. The response was incomplete or did not conform to JSON mode.')
 }
 
 async function askForJson(
