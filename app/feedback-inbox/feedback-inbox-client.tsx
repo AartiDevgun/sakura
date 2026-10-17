@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { LockKeyhole, RefreshCw, Star } from 'lucide-react'
 
 type FeedbackEntry = {
@@ -18,7 +18,7 @@ export function FeedbackInboxClient() {
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
 
-  async function loadFeedback(event?: React.FormEvent<HTMLFormElement>) {
+  async function loadFeedback(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault()
     if (!token.trim() || busy) return
     setBusy(true)
