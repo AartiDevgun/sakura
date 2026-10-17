@@ -719,12 +719,12 @@ export async function liveResearch(
   const sources = await collectEvidence(company, undefined, signal)
   const result = await askForJson(
     RESEARCH_SYSTEM,
-    `Investigate ${company} for Track A: Banking, NBFCs & Financial Services. Return the three mandatory hypotheses below as the first three angles, in this order, plus at most one additional company-specific angle:
-1. Loan-book growth versus asset quality: test whether advances/loan growth and relevant asset-quality measures (gross/net NPAs, credit costs, provisioning) are moving in different directions over comparable periods.
-2. Hidden funding dependencies: test whether disclosures from banks, co-lending partners, institutional funders, rating agencies or regulators reveal dependencies not obvious from the company's own disclosures.
-3. Five-year funding mix/customer profile: compare the funding mix or customer profile over roughly five years and investigate when and why it changed.
-4. Optional company-specific hypothesis only if the supplied evidence suggests a genuinely distinct non-obvious angle.
-Rank the candidates by novelty, evidence quality and independence, comparable calculations, counterargument quality, and ability to falsify. Do not call the first hypothesis the winner before it has been tested.
+    `Investigate ${company} for Track A: Banking, NBFCs & Financial Services. Create up to eight distinct research angles. The first three entries MUST be the mandatory hypotheses in exactly this order, so the app can test them first:
+1. Loan-book growth versus asset quality: compare advances/AUM/disbursements with gross and net NPAs, credit costs, provisioning, delinquency or collection metrics over comparable periods. If it is not a lender, state that limitation in the rationale and test an applicable financial-services equivalent.
+2. Hidden funding, partner and ecosystem dependencies: use bank/co-lending/funder disclosures, liability composition, joint ventures, related parties, regulator/exchange filings and counterparty/partner announcements; look beyond the company’s own statements.
+3. Five-year funding mix/customer profile: compare funding/liability mix, customer composition, or lending mix across roughly five years and explain observed changes only when disclosures support the explanation.
+After those three, generate up to five MORE materially different company-specific hypotheses, not generic rephrasings. Consider (only where applicable): recurring versus one-off earnings, cash flow versus reported profit, capital adequacy/liquidity and capital deployment, subsidiary/JV economics and partner dependence, concentration by borrower/sector/geography, cost-to-income and operating leverage, launch-to-monetisation conversion, related-party/Reliance-group dependencies, regulation/licence dependencies, and divergence between management narrative and filed results.
+For each additional angle, explain what concrete observation would confirm or disprove it. Exclude angles unsupported by the supplied source excerpts, but explore every distinct plausible line of inquiry visible from them. Do not treat a rating-agency rationale as a substitute for company filings or exchange-published financial results. Rank optional angles by preliminary evidence signal (strong, then moderate, then weak); the mandatory three must stay first. Do not declare any hypothesis a finding until it has been investigated.
 
 Use this evidence:
 ${JSON.stringify(evidenceForPrompt(sources))}
@@ -751,7 +751,7 @@ sourceIndexes must refer only to supplied sourceIndex numbers. The angles are hy
     throw new Error('SAKURA could not form research angles from the retrieved evidence.')
   }
 
-  const angles = rawAngles.slice(0, 4).map((value, index) => {
+  const angles = rawAngles.slice(0, 8).map((value, index) => {
     const item = record(value)
     const title = text(item.title, `Research angle ${index + 1}`)
     const indices = Array.isArray(item.sourceIndexes)
