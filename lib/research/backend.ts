@@ -5,9 +5,8 @@ import type { BackendMode } from './schema'
 
 export function getBackendMode(): BackendMode {
   const externalBackend = Boolean(process.env.SIGNALFORGE_API_URL)
-  const localResearch = Boolean(
-    process.env.TAVILY_API_KEY && process.env.GROQ_API_KEY
-  )
+  const hasResearchModel = Boolean(process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY)
+  const localResearch = Boolean(process.env.TAVILY_API_KEY && hasResearchModel)
 
   return externalBackend || localResearch ? 'live' : 'mock'
 }
