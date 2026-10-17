@@ -664,28 +664,38 @@ function sourceExcerpt(content: string, maxChars = 1500): string {
   return chosen.join('\n[…]\n').slice(0, maxChars)
 }
 function evidenceForPrompt(sources: Evidence[]) {
-  // Keep the prompt compact for provider payload limits, while prioritising source passages likely to contain comparable figures.
-  // Preserve each source's original index so model citations still resolve to the right URL.
-  return sources
+  // Preserve original sourceIndex values while choosing source-diverse passages.
+  const ranked = sources
     .map((item, sourceIndex) => ({ item, sourceIndex }))
     .sort((a, b) => {
-      const score = ({ item }: { item: Evidence }) =>
-        (item.source.sourceTier === 'primary' ? 3 : item.source.sourceTier === 'secondary' ? 1 : 0) +
-        (/\d/.test(item.content) ? 2 : 0) +
-        (/(revenue|profit|deposit|advance|npa|margin|assets|liabilit|quarter|annual report|financial result)/i.test(item.content) ? 2 : 0)
-      return score(b) - score(a)
+      const extra = ({ item }: { item: Evidence }) =>
+        (/\d/.test(item.content) ? 0.2 : 0) +
+        (/(revenue|profit|deposit|advance|NPA|margin|assets|liabilities|quarter|annual report|financial result|cash flow|joint venture)/i.test(item.content) ? 0.2 : 0)
+      return sourceQualityScore(b.item) + extra(b) - sourceQualityScore(a.item) - extra(a)
     })
-    .slice(0, 6)
-    .map(({ item, sourceIndex }) => ({
-      sourceIndex,
-      title: item.source.title.slice(0, 140),
-      url: item.source.url,
-      publisher: item.source.publisher,
-      publishedAt: item.source.publishedAt ?? null,
-      sourceType: item.source.sourceType ?? 'other',
-      sourceTier: item.source.sourceTier ?? 'unverified',
-      excerpt: sourceExcerpt(item.content),
-    }))
+
+  const selected: { item: Evidence; sourceIndex: number }[] = []
+  const hostCounts = new Map<string, number>()
+  let ratingCount = 0
+  for (const entry of ranked) {
+    const rating = isRatingRationale(entry.item)
+    if ((hostCounts.get(entry.item.host) ?? 0) >= 2 || (rating && ratingCount >= 1)) continue
+    selected.push(entry)
+    hostCounts.set(entry.item.host, (hostCounts.get(entry.item.host) ?? 0) + 1)
+    if (rating) ratingCount += 1
+    if (selected.length >= 8) break
+  }
+
+  return selected.map(({ item, sourceIndex }) => ({
+    sourceIndex,
+    title: item.source.title.slice(0, 140),
+    url: item.source.url,
+    publisher: item.source.publisher,
+    publishedAt: item.source.publishedAt ?? null,
+    sourceType: item.source.sourceType ?? 'other',
+    sourceTier: item.source.sourceTier ?? 'unverified',
+    excerpt: sourceExcerpt(item.content),
+  }))
 }
 
 const RESEARCH_SYSTEM = `
