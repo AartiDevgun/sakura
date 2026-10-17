@@ -50,7 +50,9 @@ export async function GET(request: Request) {
   const limit = Number.isSafeInteger(requestedLimit) ? Math.max(1, Math.min(200, requestedLimit)) : 100
 
   try {
-    const feedback = await getJsonList<StoredFeedback>('feedback-inbox', 'latest', limit)
+    const cutoff = Date.now() - FEEDBACK_TTL_SECONDS * 1000
+    const feedback = (await getJsonList<StoredFeedback>('feedback-inbox', 'latest', limit))
+      .filter(entry => Number.isFinite(Date.parse(entry.submittedAt)) && Date.parse(entry.submittedAt) >= cutoff)
     return NextResponse.json({ feedback })
   } catch (error) {
     return errorResponse(error)
