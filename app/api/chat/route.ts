@@ -7,7 +7,7 @@ const chatRequestSchema = z.object({
   question: z.string().trim().min(2, 'Ask SAKURA a question.').max(1000, 'Keep your question under 1,000 characters.'),
 })
 
-const MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash'
+const MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-3.8-flash'
 const CHAT_TTL_SECONDS = 6 * 60 * 60
 const SYSTEM_PROMPT = 'You are SAKURA, a warm, friendly financial-learning companion. Answer questions about finance, stocks, banking, business, startups, economics, and financial terminology in clear, beginner-friendly language. Use simple examples and explain jargon. If asked to explain a term, start with a plain-language definition. Do not pretend to have live market prices, current news, or retrieved sources. Say when a question needs current data. Never give personalised buy/sell/hold recommendations or promise returns. Be honest about uncertainty. Keep most answers concise and structured.'
 
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       JSON.stringify([MODEL, normalizedQuestion]),
       CHAT_TTL_SECONDS,
       async () => {
-        const limit = Number.parseInt(process.env.SAKURA_GEMINI_DAILY_LIMIT ?? '30', 10)
+        const limit = Number.parseInt(process.env.SAKURA_GEMINI_DAILY_LIMIT ?? '60', 10)
         if (!Number.isSafeInteger(limit) || limit < 1) {
           throw new Error('Invalid SAKURA Gemini daily limit.')
         }
@@ -60,6 +60,9 @@ export async function POST(request: Request) {
           }
           if (response.status === 401 || response.status === 403) {
             throw new Error('Gemini authentication failed. Check GEMINI_API_KEY in the Vercel environment used by this deployment, then redeploy.')
+          }
+          if (response.status === 404) {
+            throw new Error(`Gemini could not find chat model "${MODEL}". Set GEMINI_CHAT_MODEL to gemini-3.8-flash in Vercel Preview, then redeploy.`)
           }
           if (response.status === 413) {
             throw new Error('Gemini request payload was too large (413). Please shorten the question and retry.')
