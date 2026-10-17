@@ -55,6 +55,7 @@ export function ReportDashboard({
           <p className="mt-1 text-sm text-rose-100/45">Banking, NBFCs & financial services · Public-evidence investigation</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <StatChip label="Angles tested" value={String(Math.min(research.angles.length, 3))} />
           <StatChip label="Sources" value={String(report.sources.length)} />
           <StatChip label="Primary" value={String(primaryCount)} />
           <StatChip label="Evidence strength" value={confidenceLabel} />
