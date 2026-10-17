@@ -404,7 +404,8 @@ async function askGeminiForJson(
         generationConfig: {
           responseMimeType: 'application/json',
           temperature: 0.2,
-          maxOutputTokens: 2000,
+          // Full research reports contain several source-linked arrays; 2,000 tokens can truncate the JSON.
+          maxOutputTokens: 8192,
         },
       }),
       signal,
