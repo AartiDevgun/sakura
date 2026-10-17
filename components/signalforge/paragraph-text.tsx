@@ -6,16 +6,21 @@ type TextBlock =
 function splitLongLine(value: string): string[] {
   const line = value.trim()
   if (!line) return []
-  if (line.length < 320) return [line]
 
-  // Model replies sometimes arrive as one long line. Group sentences into short
-  // paragraphs so they stay scannable even when the model omits blank lines.
-  const sentences = line.match(/[^.!?]+(?:[.!?]+|$)/g)?.map(part => part.trim()).filter(Boolean) ?? [line]
-  if (sentences.length < 3) return [line]
+  // Sentence boundaries are split only when punctuation is followed by whitespace,
+  // which avoids breaking decimals such as 3.8 or figures such as 12.5%.
+  const sentences = line
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9•#])/)
+    .map(part => part.trim())
+    .filter(Boolean)
+  if (sentences.length < 2) return [line]
+  if (sentences.length === 2 && line.length < 180) return [line]
 
+  // Keep paragraphs brief even if the model omitted its blank-line separators.
+  const groupSize = sentences.length === 2 ? 1 : 2
   const paragraphs: string[] = []
-  for (let index = 0; index < sentences.length; index += 2) {
-    paragraphs.push(sentences.slice(index, index + 2).join(' '))
+  for (let index = 0; index < sentences.length; index += groupSize) {
+    paragraphs.push(sentences.slice(index, index + groupSize).join(' '))
   }
   return paragraphs
 }
