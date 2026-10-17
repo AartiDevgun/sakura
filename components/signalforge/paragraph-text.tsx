@@ -1,5 +1,3 @@
-import type { ReactNode } from 'react'
-
 type TextBlock =
   | { type: 'paragraph'; text: string }
   | { type: 'list'; ordered: boolean; items: string[] }
