@@ -440,7 +440,7 @@ async function askForJson(
   )
 }
 
-function sourceExcerpt(content: string, maxChars = 2600): string {
+function sourceExcerpt(content: string, maxChars = 1500): string {
   if (content.length <= maxChars) return content
 
   const units = content
@@ -485,18 +485,28 @@ function sourceExcerpt(content: string, maxChars = 2600): string {
   return chosen.join('\n[…]\n').slice(0, maxChars)
 }
 function evidenceForPrompt(sources: Evidence[]) {
-  // Keep excerpts bounded, but include relevant figures and reporting periods from beyond the first page.
-  // Source indexes remain aligned with the first eight entries in the source array.
-  return sources.slice(0, 8).map((item, index) => ({
-    sourceIndex: index,
-    title: item.source.title.slice(0, 180),
-    url: item.source.url,
-    publisher: item.source.publisher,
-    publishedAt: item.source.publishedAt ?? null,
-    sourceType: item.source.sourceType ?? 'other',
-    sourceTier: item.source.sourceTier ?? 'unverified',
-    excerpt: sourceExcerpt(item.content),
-  }))
+  // Keep the prompt compact for provider payload limits, while prioritising source passages likely to contain comparable figures.
+  // Preserve each source's original index so model citations still resolve to the right URL.
+  return sources
+    .map((item, sourceIndex) => ({ item, sourceIndex }))
+    .sort((a, b) => {
+      const score = ({ item }: { item: Evidence }) =>
+        (item.source.sourceTier === 'primary' ? 3 : item.source.sourceTier === 'secondary' ? 1 : 0) +
+        (/\d/.test(item.content) ? 2 : 0) +
+        (/(revenue|profit|deposit|advance|npa|margin|assets|liabilit|quarter|annual report|financial result)/i.test(item.content) ? 2 : 0)
+      return score(b) - score(a)
+    })
+    .slice(0, 6)
+    .map(({ item, sourceIndex }) => ({
+      sourceIndex,
+      title: item.source.title.slice(0, 140),
+      url: item.source.url,
+      publisher: item.source.publisher,
+      publishedAt: item.source.publishedAt ?? null,
+      sourceType: item.source.sourceType ?? 'other',
+      sourceTier: item.source.sourceTier ?? 'unverified',
+      excerpt: sourceExcerpt(item.content),
+    }))
 }
 
 const RESEARCH_SYSTEM = `
