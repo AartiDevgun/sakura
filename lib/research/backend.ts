@@ -4,6 +4,9 @@ import type { z } from 'zod'
 import type { BackendMode } from './schema'
 
 export function getBackendMode(): BackendMode {
+  // Allows preview deployments to render and exercise the UI without consuming model/search quotas.
+  if (process.env.SAKURA_FORCE_MOCK === 'true') return 'mock'
+
   const externalBackend = Boolean(process.env.SIGNALFORGE_API_URL)
   const localResearch = Boolean(
     process.env.TAVILY_API_KEY && process.env.GROQ_API_KEY
