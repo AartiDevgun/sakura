@@ -753,7 +753,7 @@ sourceIndexes must refer only to supplied sourceIndex numbers. The angles are hy
     throw new Error('SAKURA could not form research angles from the retrieved evidence.')
   }
 
-  const angles = rawAngles.slice(0, 8).map((value, index) => {
+  const mappedAngles = rawAngles.slice(0, 8).map((value, index) => {
     const item = record(value)
     const title = text(item.title, `Research angle ${index + 1}`)
     const indices = Array.isArray(item.sourceIndexes)
@@ -780,6 +780,15 @@ sourceIndexes must refer only to supplied sourceIndex numbers. The angles are hy
       signalStrength,
     } as const
   })
+  // Keep the three mandatory Track A hypotheses in the required order. Only the
+  // company-specific candidates are sorted by their preliminary signal strength.
+  const preliminarySignalRank = { strong: 3, moderate: 2, weak: 1 } as const
+  const angles = [
+    ...mappedAngles.slice(0, 3),
+    ...mappedAngles.slice(3).sort(
+      (a, b) => preliminarySignalRank[b.signalStrength] - preliminarySignalRank[a.signalStrength],
+    ),
+  ]
 
   const response: ResearchResponse = {
     mode: 'live',
@@ -844,7 +853,6 @@ function verifiedEvidenceClaims(value: unknown, sources: Evidence[]): EvidenceCl
   candidates.sort((a, b) => sourceQualityScore(b.source) - sourceQualityScore(a.source))
   const selected: EvidenceClaim[] = []
   const usedSourceIds = new Set<string>()
-  const usedPublishers = new Set<string>()
   let ratingSourceCount = 0
 
   for (const candidate of candidates) {
@@ -855,7 +863,6 @@ function verifiedEvidenceClaims(value: unknown, sources: Evidence[]): EvidenceCl
 
     selected.push(candidate.claim)
     usedSourceIds.add(candidate.claim.sourceId)
-    usedPublishers.add(source.host)
     if (rating) ratingSourceCount += 1
     if (selected.length >= 8) break
   }
@@ -1183,13 +1190,21 @@ Rules:
       ? rawConfidence
       : 'low'
 
-  // Confidence reflects independent publisher diversity, not raw URL count alone.
+  // Confidence requires evidence breadth, and primary disclosures must actually be cited
+  // in verified claims—not merely present somewhere in the source list.
   const independentPublisherCount = new Set(sources.map(item => item.host)).size
+  const citedEvidenceSources = evidence
+    .map(claim => sources.find(source => source.source.id === claim.sourceId))
+    .filter((source): source is Evidence => Boolean(source))
+  const evidencePublisherCount = new Set(citedEvidenceSources.map(source => source.host)).size
+  const primaryCitedSourceCount = new Set(
+    citedEvidenceSources.filter(source => source.source.sourceTier === 'primary').map(source => source.host),
+  ).size
   const sourcedCounterargumentCount = counterarguments.filter(item => Boolean(item.sourceId)).length
-  if (independentPublisherCount < 3 || evidence.length < 2 || sourcedCounterargumentCount === 0) {
+  if (independentPublisherCount < 3 || evidencePublisherCount < 3 || evidence.length < 3 || sourcedCounterargumentCount === 0 || primaryCitedSourceCount < 2) {
     if (confidence === 'high') confidence = 'medium'
   }
-  if (independentPublisherCount < 2 || evidence.length === 0) confidence = 'low'
+  if (independentPublisherCount < 2 || evidencePublisherCount < 2 || evidence.length < 2) confidence = 'low'
   if (calculations.length === 0 && confidence === 'high') confidence = 'medium'
   const confidenceWasAdjusted =
     (rawConfidence === 'high' && confidence !== 'high') ||
@@ -1197,8 +1212,9 @@ Rules:
   const modelConfidenceReason = text(result.confidenceReason)
   const confidenceReason = [
     modelConfidenceReason,
-    `Validation summary: ${independentPublisherCount} distinct publishers, ${evidence.length} verified claim passages, ${calculations.length} verified calculations, and ${sourcedCounterargumentCount} source-linked counterarguments.`,
-    independentPublisherCount < 3 ? 'Publisher diversity is limited; different URLs may repeat the same underlying disclosure.' : '',
+    `Validation summary: ${independentPublisherCount} distinct publishers retrieved; ${evidencePublisherCount} distinct publishers in verified claim passages; ${primaryCitedSourceCount} primary-disclosure publishers cited; ${evidence.length} verified passages; ${calculations.length} verified calculations; and ${sourcedCounterargumentCount} source-linked counterarguments.`,
+    independentPublisherCount < 3 || evidencePublisherCount < 3 ? 'Publisher diversity is limited; different URLs may repeat the same underlying disclosure.' : '',
+    primaryCitedSourceCount < 2 ? 'Fewer than two primary-disclosure publishers were linked to verified claims; review the original exchange filings and company results before trusting a strong conclusion.' : '',
     sourcedCounterargumentCount === 0 ? 'No counterargument was linked to a source, so alternative explanations remain weakly tested.' : '',
   ].filter(Boolean).join(' ')
   const falsification = record(result.falsification)
