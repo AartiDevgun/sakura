@@ -42,6 +42,12 @@ export function errorResponse(error: unknown) {
       message.startsWith('AI analysis failed (') ||
       message.startsWith('Groq authentication failed.') ||
       message.startsWith('Gemini authentication failed.') ||
+      message.startsWith('Gemini could not find model') ||
+      message.startsWith('Gemini rejected the research request (') ||
+      message.startsWith('Gemini research request failed (') ||
+      message.startsWith('Gemini could not process the research prompt.') ||
+      message.startsWith('Gemini returned an empty research response.') ||
+      message.startsWith('Gemini returned invalid JSON.') ||
       message.startsWith('Gemini rejected the chat request.') ||
       message.startsWith('Gemini rate or usage limit reached.') ||
       message.startsWith('Gemini chat request failed (') ||
@@ -69,6 +75,12 @@ export function errorResponse(error: unknown) {
       const clientError = message.startsWith('Research session expired') ||
         message.startsWith('The selected research angle')
       const providerError = message.startsWith('Gemini authentication failed') ||
+        message.startsWith('Gemini could not find model') ||
+        message.startsWith('Gemini rejected the research request') ||
+        message.startsWith('Gemini research request failed') ||
+        message.startsWith('Gemini could not process the research prompt') ||
+        message.startsWith('Gemini returned an empty research response') ||
+        message.startsWith('Gemini returned invalid JSON') ||
         message.startsWith('Gemini rejected the chat request') ||
         message.startsWith('Gemini chat request failed') ||
         message.startsWith('Gemini request payload was too large') ||
