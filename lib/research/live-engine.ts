@@ -1248,7 +1248,7 @@ Rules:
     modelConfidenceReason,
     `Validation summary: ${independentPublisherCount} distinct publishers retrieved; ${evidencePublisherCount} distinct publishers in verified claim passages; ${primaryCitedDocumentCount} primary-disclosure documents cited; ${evidence.length} verified passages; ${calculations.length} verified calculations; and ${sourcedCounterargumentCount} source-linked counterarguments.`,
     independentPublisherCount < 3 || evidencePublisherCount < 3 ? 'Publisher diversity is limited; different URLs may repeat the same underlying disclosure.' : '',
-    primaryCitedSourceCount < 2 ? 'Fewer than two primary-disclosure documents were linked to verified claims; review the original exchange filings and company results before trusting a strong conclusion.' : '',
+    primaryCitedDocumentCount < 2 ? 'Fewer than two primary-disclosure documents were linked to verified claims; review the original exchange filings and company results before trusting a strong conclusion.' : '',
     sourcedCounterargumentCount === 0 ? 'No counterargument was linked to a source, so alternative explanations remain weakly tested.' : '',
   ].filter(Boolean).join(' ')
   const falsification = record(result.falsification)
