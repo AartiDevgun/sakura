@@ -46,7 +46,7 @@ export async function POST(request: Request) {
               contents: [{ role: 'user', parts: [{ text: question }] }],
               generationConfig: {
                 maxOutputTokens: 900,
-                temperature: 0.5,
+                thinkingConfig: { thinkingLevel: 'low' },
               },
             }),
             cache: 'no-store',
