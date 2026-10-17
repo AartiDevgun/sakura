@@ -88,6 +88,11 @@ export async function mockInvestigation(
       headline: '[MOCK] Placeholder discovery',
       summary: `[MOCK] This card shows where the backend's main discovery about ${company} will appear. It is not a finding.`,
       confidence: 'low',
+      whyItMatters: [
+        '[MOCK] Demonstrates the significance bullet layout only; no company-specific implication is established.',
+        '[MOCK] This placeholder contains no verified financial evidence and must not be treated as a finding.',
+        '[MOCK] A real report would reassess the conclusion when new comparable disclosures become available.',
+      ],
     },
     report: {
       thesis: '[MOCK] Placeholder thesis. The real backend will state the claim being tested here.',
