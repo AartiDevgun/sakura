@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
     // Match the provider selected by /api/research. Local sessions are stored
     // in Redis, so the follow-up must use the same local engine when configured.
-    if (process.env.TAVILY_API_KEY && process.env.GROQ_API_KEY) {
+    if (process.env.TAVILY_API_KEY && (process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY)) {
       result = await liveInvestigation(
         body.data.company,
         body.data.angleId,
