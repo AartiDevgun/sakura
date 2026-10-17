@@ -31,7 +31,7 @@ type Flow =
   | { step: 'researching'; company: string }
   | { step: 'research-error'; company: string; message: string }
   | { step: 'angles'; research: ResearchResponse }
-  | { step: 'investigating'; research: ResearchResponse; angleId: string }
+  | { step: 'investigating'; research: ResearchResponse; angleId: string; angleIndex?: number; angleTotal?: number }
   | { step: 'investigation-error'; research: ResearchResponse; angleId: string; message: string }
   | { step: 'result'; research: ResearchResponse; investigation: InvestigationResponse; discoveries: InvestigationResponse[] }
 
@@ -100,14 +100,19 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
         return
       }
 
-      // Test up to three candidate angles instead of assuming the first model-ranked
-      // hypothesis is the strongest. Each candidate still passes the same validators.
+      // Investigate all generated angles. The first three are mandatory and stay in
+      // their required order; then test every optional angle from strongest to weakest.
       const candidates: InvestigationResponse[] = []
       const errors: string[] = []
-      const anglesToTest = research.angles.slice(0, 3)
+      const angleRank = { strong: 3, moderate: 2, weak: 1 } as const
+      const mandatoryAngles = research.angles.slice(0, 3)
+      const optionalAngles = research.angles.slice(3).sort(
+        (a, b) => angleRank[b.signalStrength || 'moderate'] - angleRank[a.signalStrength || 'moderate'],
+      )
+      const anglesToTest = [...mandatoryAngles, ...optionalAngles]
       for (let index = 0; index < anglesToTest.length; index += 1) {
         const angle = anglesToTest[index]
-        setFlow({ step: 'investigating', research, angleId: angle.id })
+        setFlow({ step: 'investigating', research, angleId: angle.id, angleIndex: index + 1, angleTotal: anglesToTest.length })
         try {
           const investigation = await postJson(
             '/api/research/investigate',
@@ -127,7 +132,16 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
         return
       }
 
-      const ranked = [...candidates].sort((a, b) => scoreInvestigation(b) - scoreInvestigation(a))
+      const confidenceRank = { high: 3, medium: 2, low: 1 } as const
+      const angleSignalRank = { strong: 3, moderate: 2, weak: 1 } as const
+      const ranked = [...candidates].sort((a, b) => {
+        const confidenceDifference = confidenceRank[b.discovery.confidence] - confidenceRank[a.discovery.confidence]
+        if (confidenceDifference !== 0) return confidenceDifference
+        const aSignal = research.angles.find(angle => angle.id === a.angleId)?.signalStrength || 'moderate'
+        const bSignal = research.angles.find(angle => angle.id === b.angleId)?.signalStrength || 'moderate'
+        const signalDifference = angleSignalRank[bSignal] - angleSignalRank[aSignal]
+        return signalDifference || scoreInvestigation(b) - scoreInvestigation(a)
+      })
       setFlow({ step: 'result', research, investigation: ranked[0], discoveries: ranked })
     } catch (error) {
       if (isAbortError(error)) return
@@ -335,7 +349,9 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                 ? 'Searching for fresh support and alternative explanations for ' + activeCompany + '.'
                 : flow.step === 'researching'
                   ? 'Exploring public evidence for ' + activeCompany + '.'
-                  : 'Examining evidence and challenging the hypothesis for ' + activeCompany + '.'}
+                  : flow.step === 'investigating'
+                    ? 'Testing discovery ' + (flow.angleIndex || 1) + ' of ' + (flow.angleTotal || flow.research.angles.length) + ' for ' + activeCompany + '. The mandatory checks run first, followed by additional angles ranked by preliminary signal.'
+                    : 'Examining evidence and challenging the hypothesis for ' + activeCompany + '.'}
             </p>
             <div className="mx-auto mt-8 h-px w-36 overflow-hidden bg-pink-100/10">
               <div className="h-full w-1/2 animate-[sakura-scan_1.8s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-pink-300 to-transparent" />
