@@ -23,9 +23,9 @@ export async function POST(request: Request) {
 
     // Prefer the configured local Tavily + Groq engine. This keeps the
     // research session and follow-up investigation on the same backend.
-    if (process.env.TAVILY_API_KEY && process.env.GROQ_API_KEY) {
+    if (process.env.SAKURA_FORCE_MOCK !== 'true' && process.env.TAVILY_API_KEY && process.env.GROQ_API_KEY) {
       result = await liveResearch(body.data.company, request.signal)
-    } else if (process.env.SIGNALFORGE_API_URL) {
+    } else if (process.env.SAKURA_FORCE_MOCK !== 'true' && process.env.SIGNALFORGE_API_URL) {
       result = await callBackend(
         '/research',
         body.data,
