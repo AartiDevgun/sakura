@@ -43,7 +43,7 @@ export function ReportDashboard({
   const selectedAngle = research.angles.find(angle => angle.id === investigation.angleId)
   const cited = new Set((report.evidence ?? []).map(item => item.sourceId))
   const primaryCount = report.sources.filter(source => source.sourceTier === 'primary').length
-  const independentPublisherCount = new Set(report.sources.map(source => { try { return new URL(source.url).hostname.replace(/^www\\./, '').toLowerCase() } catch { return source.publisher?.toLowerCase() || source.id } })).size
+  const independentPublisherCount = new Set(report.sources.map(source => { try { return new URL(source.url).hostname.replace(/^www\./, '').toLowerCase() } catch { return source.publisher?.toLowerCase() || source.id } })).size
   const confidenceLabel = discovery.confidence === 'high' ? 'Strong' : discovery.confidence === 'medium' ? 'Moderate' : 'Weak'
 
   return (
@@ -124,7 +124,7 @@ export function ReportDashboard({
             </ReportSection>
 
             <ReportSection title="Timeline" subtitle="Verified changes in chronological order">
-              {report.timeline.length > 0 ? <div className="space-y-3">{[...report.timeline].sort((a, b) => { const yearA = Number(a.date.match(/(?:19|20)\\d{2}/)?.[0] ?? 0); const yearB = Number(b.date.match(/(?:19|20)\\d{2}/)?.[0] ?? 0); return yearA - yearB || Date.parse(a.date) - Date.parse(b.date) }).map((event, index) => {
+              {report.timeline.length > 0 ? <div className="space-y-3">{[...report.timeline].sort((a, b) => { const yearA = Number(a.date.match(/(?:19|20)\d{2}/)?.[0] ?? 0); const yearB = Number(b.date.match(/(?:19|20)\d{2}/)?.[0] ?? 0); return yearA - yearB || Date.parse(a.date) - Date.parse(b.date) }).map((event, index) => {
                 const source = report.sources.find(candidate => candidate.id === event.sourceId)
                 return <div key={event.date + '-overview-' + index} className="rounded-xl border border-pink-200/10 bg-black/30 p-4">
                   <p className="text-xs font-semibold text-pink-300">{event.date}</p><p className="mt-2 text-sm leading-6 text-rose-50/80">{event.event}</p>
