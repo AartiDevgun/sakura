@@ -376,68 +376,170 @@ function mergeEvidence(existing: Evidence[], fresh: Evidence[]): Evidence[] {
   return results
 }
 
+async function askGeminiForJson(
+  system: string,
+  prompt: string,
+  signal?: AbortSignal,
+): Promise<JsonObject> {
+  const limit = Number.parseInt(process.env.SAKURA_GEMINI_DAILY_LIMIT ?? '60', 10)
+  if (!Number.isSafeInteger(limit) || limit < 1) {
+    throw new Error('Invalid SAKURA Gemini daily limit.')
+  }
+
+  // Share the Gemini budget bucket with SAKURA's existing Gemini chat feature.
+  await consumeDailyBudget('gemini', limit)
+
+  const model = process.env.GEMINI_RESEARCH_MODEL || 'gemini-3.8-flash'
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'x-goog-api-key': requiredEnv('GEMINI_API_KEY'),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+          maxOutputTokens: 2000,
+        },
+      }),
+      signal,
+      cache: 'no-store',
+    },
+  )
+
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Gemini authentication failed. Check GEMINI_API_KEY in Vercel Preview.')
+    }
+    if (response.status === 429) {
+      throw new Error('Gemini rate or usage limit reached. Check the active Gemini model quota in Google AI Studio.')
+    }
+    if (response.status === 404) {
+      throw new Error(`Gemini could not find model "${model}". Set GEMINI_RESEARCH_MODEL to a model available in Google AI Studio.`)
+    }
+    throw new Error(`Gemini research request failed (${response.status}). Check Google AI Studio and SAKURA environment settings.`)
+  }
+
+  const payload = (await response.json()) as {
+    candidates?: { content?: { parts?: { text?: string | null }[] } }[]
+    promptFeedback?: { blockReason?: string }
+  }
+  const content = payload.candidates?.[0]?.content?.parts
+    ?.map(part => part.text ?? '')
+    .join('')
+    .trim()
+
+  if (!content) {
+    if (payload.promptFeedback?.blockReason) {
+      throw new Error('Gemini could not process the research prompt. Try again with a narrower research angle.')
+    }
+    throw new Error('Gemini returned an empty research response.')
+  }
+
+  try {
+    return record(JSON.parse(content))
+  } catch {
+    throw new Error('Gemini returned invalid JSON. Please retry.')
+  }
+}
+
 async function askForJson(
   system: string,
   prompt: string,
   signal?: AbortSignal,
 ): Promise<JsonObject> {
+  const geminiModel = process.env.GEMINI_RESEARCH_MODEL || 'gemini-3.8-flash'
+  const providerPreference = process.env.SAKURA_RESEARCH_PROVIDER?.toLowerCase()
+  const cacheScope = 'research-analysis'
+
   return cachedJson<JsonObject>(
-    'groq-analysis',
-    `${MODEL}\0${system}\0${prompt}`,
+    cacheScope,
+    `${providerPreference || 'auto'}:${MODEL}:${geminiModel}\0${system}\0${prompt}`,
     ANALYSIS_CACHE_TTL_SECONDS,
     async () => {
-      const limit = Number.parseInt(process.env.SAKURA_GROQ_DAILY_LIMIT ?? '20', 10)
-      if (!Number.isSafeInteger(limit) || limit < 1) {
-        throw new Error('Invalid SAKURA Groq daily limit.')
+      const hasGemini = Boolean(process.env.GEMINI_API_KEY)
+      const useGeminiFirst = providerPreference === 'gemini' || !process.env.GROQ_API_KEY
+
+      if (providerPreference && providerPreference !== 'gemini' && providerPreference !== 'groq' && providerPreference !== 'auto') {
+        throw new Error('Invalid SAKURA_RESEARCH_PROVIDER. Use auto, groq, or gemini.')
       }
 
-      await consumeDailyBudget('groq', limit)
-
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${requiredEnv('GROQ_API_KEY')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: prompt },
-          ],
-          response_format: { type: 'json_object' },
-          max_completion_tokens: 2000,
-        }),
-        signal,
-        cache: 'no-store',
-      })
-
-      if (!response.ok) {
-        if (response.status === 413) {
-          throw new Error('Groq request payload was too large (413). SAKURA has reduced its source excerpts; try again, or use a shorter research angle. ')
+      if (useGeminiFirst) {
+        if (!hasGemini) {
+          throw new Error('Gemini research is selected but GEMINI_API_KEY is not configured in Vercel Preview.')
         }
-        if (response.status === 401 || response.status === 403) {
-          throw new Error('Groq authentication failed. Check GROQ_API_KEY in the Vercel environment used by this deployment, then redeploy.')
-        }
-        if (response.status === 404) {
-          throw new Error(`Groq could not find the configured model "${MODEL}". Check GROQ_MODEL in Vercel or remove it to use SAKURA’s default model.`)
-        }
-        if (response.status === 429) {
-          throw new Error('Groq rate or usage limit reached. Check the Groq Console usage page before retrying.')
-        }
-        throw new Error(`Groq analysis request failed (${response.status}). Check the Groq Console and SAKURA environment settings.`)
+        return askGeminiForJson(system, prompt, signal)
       }
-
-      const payload = (await response.json()) as {
-        choices?: { message?: { content?: string | null } }[]
-      }
-      const content = payload.choices?.[0]?.message?.content
-      if (!content) throw new Error('The AI returned an empty response.')
 
       try {
-        return record(JSON.parse(content))
-      } catch {
-        throw new Error('The AI returned invalid JSON. Please retry.')
+        const limit = Number.parseInt(process.env.SAKURA_GROQ_DAILY_LIMIT ?? '20', 10)
+        if (!Number.isSafeInteger(limit) || limit < 1) {
+          throw new Error('Invalid SAKURA Groq daily limit.')
+        }
+
+        await consumeDailyBudget('groq', limit)
+
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${requiredEnv('GROQ_API_KEY')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: prompt },
+            ],
+            response_format: { type: 'json_object' },
+            max_completion_tokens: 2000,
+          }),
+          signal,
+          cache: 'no-store',
+        })
+
+        if (!response.ok) {
+          if (response.status === 413) {
+            throw new Error('Groq request payload was too large (413). SAKURA has reduced its source excerpts; try again, or use a shorter research angle.')
+          }
+          if (response.status === 401 || response.status === 403) {
+            throw new Error('Groq authentication failed. Check GROQ_API_KEY in the Vercel environment used by this deployment, then redeploy.')
+          }
+          if (response.status === 404) {
+            throw new Error(`Groq could not find the configured model "${MODEL}". Check GROQ_MODEL in Vercel or remove it to use SAKURA’s default model.`)
+          }
+          if (response.status === 429) {
+            throw new Error('Groq rate or usage limit reached. Check the Groq Console usage page before retrying.')
+          }
+          throw new Error(`Groq analysis request failed (${response.status}). Check the Groq Console and SAKURA environment settings.`)
+        }
+
+        const payload = (await response.json()) as {
+          choices?: { message?: { content?: string | null } }[]
+        }
+        const content = payload.choices?.[0]?.message?.content
+        if (!content) throw new Error('The AI returned an empty response.')
+
+        try {
+          return record(JSON.parse(content))
+        } catch {
+          throw new Error('The AI returned invalid JSON. Please retry.')
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        const groqQuotaReached = /Daily Groq analysis allowance reached|Groq rate or usage limit reached/i.test(message)
+        const protectionUnavailable = /SAKURA usage protection is unavailable/i.test(message)
+
+        // Never bypass the shared fail-closed budget guard if Redis is unavailable.
+        if (groqQuotaReached && !protectionUnavailable && hasGemini && providerPreference !== 'groq') {
+          return askGeminiForJson(system, prompt, signal)
+        }
+        throw error
       }
     },
   )
