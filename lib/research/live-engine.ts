@@ -1801,84 +1801,97 @@ export async function livePeerComparison(
     .slice(0, 3)
     .map(entry => entry.item)
 
-  // Curated peers are search seeds, not proof. Every peer must pass a separate search
-  // and its own exact-quote verification before it can influence the conclusion.
+  // Curated peers are seeds, not the whole peer universe. Always run a targeted
+  // discovery search so dynamically surfaced mid/small-cap and non-Nifty-50 peers
+  // can be added when retrieved sources explicitly mention them.
   type SelectedPeer = FinancialPeerCandidate & { reason: string; sourceIndex?: number }
   const candidateEvidence: Evidence[] = []
   const candidateFailures: string[] = []
   const peers: SelectedPeer[] = []
   const knownPeers = knownFinancialPeers(input.company)
 
-  if (knownPeers.length > 0) {
-    peers.push(...knownPeers.slice(0, 2).map(peer => ({
-      ...peer,
-      reason: 'Selected as a candidate peer from SAKURA’s financial-company peer map; performance claims must still be verified from this company’s own sources.',
-    })))
-  } else {
-    const candidateQueries = [
-      '"' + input.company + '" ' + selectedAngle.title + ' comparable banks NBFC peers same financial metric reporting period India sector trend',
-    ]
-    const candidateBatches = await Promise.allSettled(candidateQueries.map(query => searchWeb(query, signal)))
-    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-    const candidateResults = candidateBatches.flatMap(batch => batch.status === 'fulfilled' ? batch.value : [])
-    candidateEvidence.push(...evidenceFromSearchResults(input.company, candidateResults, 10))
-    candidateFailures.push(
-      ...candidateBatches
-        .filter((batch): batch is PromiseRejectedResult => batch.status === 'rejected')
-        .map(batch => batch.reason instanceof Error ? batch.reason.message : 'A peer-discovery search failed.'),
+  peers.push(...knownPeers.slice(0, 2).map(peer => ({
+    ...peer,
+    reason: 'Candidate selected from SAKURA’s financial-company peer map. Performance claims must still be verified from this company’s own sources.',
+  })))
+
+  const profile = financialProfile(input.company)
+  const peerTerms = profile?.archetype === 'bank'
+    ? 'commercial banks small finance banks regional private banks deposits lending asset quality'
+    : profile?.archetype === 'life_insurer'
+      ? 'life insurance companies APE VNB persistency solvency embedded value'
+      : profile?.archetype === 'nbfc'
+        ? 'listed NBFCs vehicle finance gold loans housing finance microfinance consumer lending AUM cost of funds'
+        : 'listed financial services firms NBFCs lending digital finance subsidiaries insurance'
+  const candidateQueries = [
+    '"' + input.company + '" ' + selectedAngle.title + ' ' + peerTerms +
+      ' comparable competitors Indian listed companies mid-cap small-cap annual report exchange filing including companies outside Nifty 50',
+  ]
+  const candidateBatches = await Promise.allSettled(candidateQueries.map(query => searchWeb(query, signal)))
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+  const candidateResults = candidateBatches.flatMap(batch => batch.status === 'fulfilled' ? batch.value : [])
+  candidateEvidence.push(...evidenceFromSearchResults(input.company, candidateResults, 10))
+  candidateFailures.push(
+    ...candidateBatches
+      .filter((batch): batch is PromiseRejectedResult => batch.status === 'rejected')
+      .map(batch => batch.reason instanceof Error ? batch.reason.message : 'A peer-discovery search failed.'),
+  )
+
+  // If search snippets support more candidates, use the existing analysis model
+  // to extract company names from those sources. This is not limited to Nifty 50.
+  // The UI currently supports up to three peer rows, so keep three distinct peers.
+  if (candidateEvidence.length > 0 && peers.length < 3) {
+    const candidateContext = candidateEvidence.map((item, sourceIndex) => ({
+      sourceIndex,
+      title: item.source.title,
+      url: item.source.url,
+      publisher: item.source.publisher,
+      excerpt: sourceExcerpt(item.content, 900),
+    }))
+    const alreadySelected = peers.map(peer => peer.company)
+    const peerPlan = await askForJson(
+      RESEARCH_SYSTEM,
+      [
+        'Discover additional peer companies for a cross-company financial comparison in India.',
+        'Company under investigation: ' + input.company,
+        'Research angle: ' + selectedAngle.title,
+        'Issue to test (a lead, not verified evidence): ' + input.discoveryHeadline,
+        'The target universe is Indian listed financial companies across large-, mid- and small-cap segments. Do NOT restrict candidates to Nifty 50 companies or major index constituents. Prefer business-model and metric comparability over company size.',
+        'Look for relevant non-Nifty-50 and smaller listed peers where the supplied sources explicitly mention them. Do not claim a company is outside an index unless the sources support that fact.',
+        'Already selected peer seeds (do not repeat these): ' + JSON.stringify(alreadySelected),
+        'Only choose additional company names explicitly present in the supplied source title or excerpt. Do not invent names. Select candidates whose business model reasonably fits the subject company and research angle.',
+        'Candidate discovery sources:',
+        JSON.stringify(candidateContext),
+        'Return JSON only in this shape: {"peers":[{"company":"Exact company name as shown in source","relationship":"direct_competitor | similar_business_model | adjacent_peer","reason":"Why its business model is relevant","sourceIndex":0}]}',
+        'Return up to three additional candidates, ordered by comparability. The application will deduplicate them and keep the best available candidates within its three-peer limit.',
+      ].join('\n\n'),
+      signal,
     )
 
-    if (candidateEvidence.length > 0) {
-      const candidateContext = candidateEvidence.map((item, sourceIndex) => ({
+    const seenNames = new Set(peers.map(peer => comparableEntityName(peer.company)))
+    for (const value of (Array.isArray(peerPlan.peers) ? peerPlan.peers : []).slice(0, 8)) {
+      const item = record(value)
+      const name = text(item.company).slice(0, 160)
+      const sourceIndex = validIndex(item.sourceIndex, candidateEvidence.length)
+      const relationship = item.relationship
+      const normalized = comparableEntityName(name)
+      if (
+        !name || sourceIndex === undefined ||
+        normalized === comparableEntityName(input.company) ||
+        seenNames.has(normalized) ||
+        !sourceMentionsEntity(candidateEvidence[sourceIndex], name) ||
+        !['direct_competitor', 'similar_business_model', 'adjacent_peer'].includes(String(relationship))
+      ) continue
+      seenNames.add(normalized)
+      peers.push({
+        company: name,
+        aliases: [name],
+        issuerDomains: [],
+        relationship: relationship as PeerRelationship,
+        reason: text(item.reason, 'The retrieved source suggests a potentially comparable business model.'),
         sourceIndex,
-        title: item.source.title,
-        url: item.source.url,
-        publisher: item.source.publisher,
-        excerpt: sourceExcerpt(item.content, 900),
-      }))
-      const peerPlan = await askForJson(
-        RESEARCH_SYSTEM,
-        [
-          'Find a small, defensible peer group for a cross-company financial comparison.',
-          'Company under investigation: ' + input.company,
-          'Research angle: ' + selectedAngle.title,
-          'Issue being tested (a lead from the current report, not a verified fact by itself): ' + input.discoveryHeadline,
-          'Context summary (use for search context, not as evidence): ' + input.discoverySummary,
-          'Select up to two comparable companies. Prefer similar business models and risk drivers; compare lenders with lenders, insurers with insurers, and other financial-services firms only with genuinely comparable firms.',
-          'Only choose names explicitly mentioned in the supplied source excerpts, and cite the sourceIndex where each name is explicitly mentioned. Do not invent company names or assume peers share the issue.',
-          'Candidate discovery sources:',
-          JSON.stringify(candidateContext),
-          'Return JSON only in this shape: {"peers":[{"company":"Exact company name as shown in source","relationship":"direct_competitor | similar_business_model | adjacent_peer","reason":"Why its business model is relevant","sourceIndex":0}]}',
-          'Choose up to two where evidence allows. Return fewer if there are not enough credible candidates.',
-        ].join('\n\n'),
-        signal,
-      )
-
-      const seenNames = new Set<string>()
-      for (const value of (Array.isArray(peerPlan.peers) ? peerPlan.peers : []).slice(0, 5)) {
-        const item = record(value)
-        const name = text(item.company).slice(0, 160)
-        const sourceIndex = validIndex(item.sourceIndex, candidateEvidence.length)
-        const relationship = item.relationship
-        const normalized = comparableEntityName(name)
-        if (
-          !name || sourceIndex === undefined ||
-          normalized === comparableEntityName(input.company) ||
-          seenNames.has(normalized) ||
-          !sourceMentionsEntity(candidateEvidence[sourceIndex], name) ||
-          !['direct_competitor', 'similar_business_model', 'adjacent_peer'].includes(String(relationship))
-        ) continue
-        seenNames.add(normalized)
-        peers.push({
-          company: name,
-          aliases: [name],
-          issuerDomains: [],
-          relationship: relationship as PeerRelationship,
-          reason: text(item.reason, 'The retrieved source suggests a potentially comparable business model.'),
-          sourceIndex,
-        })
-        if (peers.length >= 2) break
-      }
+      })
+      if (peers.length >= 3) break
     }
   }
 
@@ -2009,7 +2022,7 @@ export async function livePeerComparison(
       JSON.stringify(evidencePayload),
       'Return JSON with this shape:',
       '{"outcome":"company_specific | peer_shared | industry_wide | inconclusive","outcomeRationale":"Evidence-led explanation and limits","comparisonBasis":"Metrics and periods compared or why they are not comparable","peers":[{"company":"Exact selected peer name","relationship":"direct_competitor | similar_business_model | adjacent_peer","assessment":"Peer-specific source-backed assessment","comparisonPoint":"Like-for-like comparison, or why it could not be made","evidence":[{"claim":"Peer-specific observation","quote":"Exact source quotation","sourceIndex":0,"date":"Source period or empty string"}]}],"differences":["Source-backed differences"],"limitations":["Specific gaps"]}',
-      'Return at most two peer rows. Each evidence quote must be verbatim, at least 15 characters, and use a valid sourceIndex. Peer evidence MUST cite a source whose companyAssociation is that exact peer—not the anchor or peer-selection context. Never invent values, dates, URLs or causal explanations. Prefer "inconclusive" over a confident guess.',
+      'Return up to three peer rows. Each evidence quote must be verbatim, at least 15 characters, and use a valid sourceIndex. Peer evidence MUST cite a source whose companyAssociation is that exact peer—not the anchor or peer-selection context. Never invent values, dates, URLs or causal explanations. Prefer "inconclusive" over a confident guess.',
     ].join('\n\n'),
     signal,
   )
