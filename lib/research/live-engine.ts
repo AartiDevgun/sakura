@@ -967,12 +967,20 @@ function containsNumber(sourceText: string, value: number): boolean {
 function normalise(value: string): string {
   return value
     .normalize('NFKC')
+    .replace(/[\u00ad\u200b-\u200d\ufeff]/g, '')
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
-    .replace(/[–—−]/g, '-')
+    .replace(/[‐‑‒–—−]/g, '-')
     .replace(/\s+/g, ' ')
     .toLowerCase()
     .trim()
+}
+
+/** Token fallback tolerates punctuation/line-wrap differences but never missing or reordered words/numbers. */
+function quoteTokens(value: string): string[] {
+  return normalise(value)
+    .replace(/(?<=\d),(?=\d)/g, '')
+    .match(/[\p{L}]+|\d+(?:\.\d+)?|[%₹$€£]/gu) ?? []
 }
 
 /** Local context lets a table heading supply units/period labels for a quoted cell. */
@@ -985,7 +993,29 @@ function sourceContextForQuote(sourceText: string, quote: string, radius = 180):
 }
 
 function quoteIsPresent(sourceText: string, quote: string): boolean {
-  return quote.length >= 15 && normalise(sourceText).includes(normalise(quote))
+  if (quote.length < 15) return false
+  const corpus = normalise(sourceText)
+  const needle = normalise(quote)
+  if (corpus.includes(needle)) return true
+
+  // PDF/table extraction and AI JSON handling sometimes alter only punctuation or
+  // line wraps. Require the complete ordered token sequence in the source; do not
+  // accept paraphrases, omitted words, or reordered numbers.
+  const sourceTokens = quoteTokens(sourceText)
+  const quoteTokensToFind = quoteTokens(quote)
+  if (quoteTokensToFind.length < 3 || quoteTokensToFind.length > sourceTokens.length) return false
+
+  for (let i = 0; i <= sourceTokens.length - quoteTokensToFind.length; i += 1) {
+    let match = true
+    for (let j = 0; j < quoteTokensToFind.length; j += 1) {
+      if (sourceTokens[i + j] !== quoteTokensToFind[j]) {
+        match = false
+        break
+      }
+    }
+    if (match) return true
+  }
+  return false
 }
 
 function periodIsSupported(period: string, quote: string): boolean {
@@ -1012,13 +1042,25 @@ function verifiedEvidenceClaims(value: unknown, sources: Evidence[]): EvidenceCl
   const candidates: { claim: EvidenceClaim; source: Evidence }[] = []
   for (const raw of value.slice(0, 12)) {
     const item = record(raw)
-    const sourceIndex = validIndex(item.sourceIndex, sources.length)
+    const requestedSourceIndex = validIndex(item.sourceIndex, sources.length)
     const quote = text(item.quote)
     const claim = text(item.claim)
-    if (sourceIndex === undefined || !claim || !quoteIsPresent(sources[sourceIndex].content, quote)) continue
+    if (!claim || quote.length < 15) continue
+
+    // First check the sourceIndex supplied by the model. If its index drifted while
+    // the excerpt list was ranked/merged, recover only when the same complete quote
+    // is independently present in another retrieved source. Attribute it to that
+    // matching source, never to the unverified requested index.
+    let verifiedSourceIndex = requestedSourceIndex !== undefined &&
+      quoteIsPresent(sources[requestedSourceIndex].content, quote)
+      ? requestedSourceIndex
+      : sources.findIndex(source => quoteIsPresent(source.content, quote))
+    if (verifiedSourceIndex < 0) continue
+
+    const source = sources[verifiedSourceIndex]
     candidates.push({
-      claim: { claim, quote, sourceId: sources[sourceIndex].source.id, date: text(item.date) || undefined },
-      source: sources[sourceIndex],
+      claim: { claim, quote, sourceId: source.source.id, date: text(item.date) || undefined },
+      source,
     })
   }
 
