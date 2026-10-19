@@ -1914,6 +1914,37 @@ export async function livePeerComparison(
   }))
   if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
 
+  // Stop before the second AI analysis when neither candidate yielded usable
+  // peer-owned sources. Anchor-company sources alone cannot substantiate a comparison.
+  if (peerSearches.every(entry => entry.evidence.length === 0)) {
+    const peerErrors = peerSearches.map(entry => entry.error).filter(Boolean)
+    return {
+      mode: 'live',
+      comparisonId: 'peer-comparison-' + randomUUID(),
+      company: input.company.trim(),
+      issue,
+      outcome: 'inconclusive',
+      outcomeRationale: 'No peer-company source text could be verified in this run. SAKURA stopped before comparison analysis rather than infer peer performance from the subject company’s disclosures.',
+      comparisonBasis: 'No like-for-like comparison was performed because neither candidate returned usable peer-owned source evidence.',
+      peers: peerSearches.map(({ peer, error }) => ({
+        company: peer.company,
+        relationship: peer.relationship,
+        assessment: error
+          ? 'Peer-specific retrieval failed: ' + error + ' No conclusion is drawn about this company.'
+          : 'No usable peer-owned source text was retrieved. No conclusion is drawn about this company.',
+        comparisonPoint: 'Not assessed because peer-specific source evidence was unavailable.',
+        evidence: [],
+      })),
+      differences: [],
+      limitations: [
+        'No peer-specific documents or disclosures were available to support a comparison; the result is inconclusive, not evidence that the issue is unique.',
+        ...peerErrors.slice(0, 2),
+        'A missing source is not evidence that a company is unaffected.',
+      ].slice(0, 6),
+      sources: baselineSources,
+    }
+  }
+
   const groups: { owner: string; evidence: Evidence[] }[] = []
   if (anchorEvidence.length) groups.push({ owner: input.company, evidence: anchorEvidence })
   const peerContextEvidence = peers
