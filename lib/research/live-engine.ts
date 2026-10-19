@@ -1094,77 +1094,61 @@ Do not assume the hypothesis is true. Assess whether the evidence supports it, c
 Retrieved source excerpts:
 ${JSON.stringify(evidenceForPrompt(sources))}
 
-Return JSON in this shape:
+Return JSON in this shape. Keep the answer concise enough to preserve the calculations and evidence trail within the response limit:
 {
-  "headline": "One specific discovery; state uncertainty if evidence is insufficient",
-  "summary": "Concise evidence-based explanation",
+  "headline": "One specific, useful discovery; say when evidence is insufficient",
+  "summary": "Plain-language explanation of what the sources support",
   "confidence": "low | medium | high",
-  "confidenceReason": "Why this confidence level is justified and which limitations remain",
-  "whyItMatters": ["3-5 concise implications, without overstating causality"],
-  "thesis": "What the evidence supports and what it does not establish",
-  "evidence": [
-    {
-      "claim": "Distinct material observation 1, adding information beyond the main headline",
-      "quote": "Exact passage copied verbatim from a supplied source excerpt",
-      "sourceIndex": 0,
-      "date": "A date or reporting period if present, otherwise an empty string"
-    },
-    {
-      "claim": "Distinct material observation 2, not a rephrasing of observation 1",
-      "quote": "A different exact passage copied from the supplied source excerpts",
-      "sourceIndex": 1,
-      "date": "A date or reporting period if present, otherwise an empty string"
-    },
-    {
-      "claim": "Distinct material observation 3, from a different fact or disclosure",
-      "quote": "Another exact passage copied from the supplied source excerpts",
-      "sourceIndex": 2,
-      "date": "A date or reporting period if present, otherwise an empty string"
-    },
-    {
-      "claim": "Distinct material observation 4, where the evidence supports one",
-      "quote": "Another exact passage copied from the supplied source excerpts",
-      "sourceIndex": 3,
-      "date": "A date or reporting period if present, otherwise an empty string"
-    }
-  ],
+  "confidenceReason": "Brief reason based on source quality, independence and limitations",
+  "whyItMatters": ["Three specific implications grounded in the discovery"],
+  "thesis": "What the evidence establishes and what remains uncertain",
   "calculationCandidates": [
     {
-      "label": "Metric being compared",
+      "label": "Metric compared",
       "kind": "percent_change | absolute_change | ratio | percentage_point_change",
-      "priorValue": 100,
-      "currentValue": 125,
-      "unit": "INR crore",
-      "priorPeriod": "FY2024",
-      "currentPeriod": "FY2025",
+      "priorValue": 0,
+      "currentValue": 0,
+      "unit": "Exact unit from the source",
+      "priorPeriod": "Exact prior reporting period",
+      "currentPeriod": "Exact current reporting period",
       "priorSourceIndex": 0,
       "currentSourceIndex": 1,
-      "priorQuote": "Exact quotation copied from the prior source excerpt",
-      "currentQuote": "Exact quotation copied from the current source excerpt",
-      "interpretation": "What the calculated change may indicate, without claiming causation"
+      "priorQuote": "Exact source passage containing prior value, unit and period",
+      "currentQuote": "Exact source passage containing current value, unit and period",
+      "interpretation": "What the verified arithmetic may indicate, without claiming causation"
+    }
+  ],
+  "evidence": [
+    {
+      "claim": "A distinct material observation",
+      "quote": "Exact verbatim source passage",
+      "sourceIndex": 0,
+      "date": "Date or reporting period stated in the source, or empty string"
     }
   ],
   "timeline": [
-    { "date": "Exact date or reporting period as written in the quote", "event": "Supported event", "sourceIndex": 0, "quote": "Exact source passage containing the date and supporting the event" }
+    { "date": "Exact date or reporting period", "event": "Source-supported event", "sourceIndex": 0, "quote": "Exact passage that contains the date and supports the event" }
   ],
   "counterarguments": [
-    { "argument": "Strongest plausible alternative explanation", "assessment": "Evidence for or against it", "sourceIndex": 1 }
+    { "argument": "A credible alternative explanation", "assessment": "What the evidence does or does not support", "sourceIndex": 1 }
   ],
   "falsification": {
     "condition": "A concrete future observation that would weaken or overturn the conclusion",
     "metric": "Metric to monitor or empty string",
-    "checkBy": "A reasonable future date or empty string"
+    "checkBy": "Reasonable future date or empty string"
   }
 }
 
+The zero values above are shape placeholders only. Never copy them into a result unless the quoted source itself contains those values.
+
 Rules:
 - Use only the supplied sources and their sourceIndex values.
-- Return 3-5 evidence items when the excerpts support them. Aim for distinct observations drawn from separate source documents and publishers. Cite original filings/results/investor presentations for core financial facts and use reputable independent reporting for context. Use a rating-agency rationale only as one supporting viewpoint when other sources are available; it must not become the majority of the evidence. Return fewer only when the supplied documents do not support more. Prioritise a small number of defensible, useful discoveries over several vague warning signs.
-- Each evidence item must add a separate material fact or disclosure, not repeat or lightly rephrase the headline or another item. Use a different sourceIndex for each item whenever the source pack allows it, and include at least two primary-source documents when available. Prefer different publishers and business dimensions. Do not fill the evidence list with several observations from the same rating rationale.
-- Every evidence quote must be copied verbatim from the supplied excerpts and be at least 15 characters long. The application will independently verify each quote and will display an observation only when the quote matches retrieved source text.
-- Actively look for 1-3 useful calculations before returning an empty calculationCandidates array. Search the provided excerpts for comparable financial values over time, especially net interest margin, net interest income, advances/deposits, gross or net NPA, credit cost, provisions, profit and capital ratios when applicable.
-- Prefer values from an official quarterly result, annual report or investor presentation. Use the exact source wording around each number, including its reporting period and unit. The two figures may come from different passages in the same filing if both passage quotes are independently present in the supplied excerpt.
-- Include a calculation only when both figures, comparable units and distinct reporting periods are directly supported by source quotations; the application independently calculates the result. Never infer a missing value or use an illustrative number as real data.
+- Keep the response compact: usually 3-4 evidence items, 1-2 calculations when supported, 2-4 timeline events and 1-2 counterarguments. Prefer one useful, defensible discovery over several vague warning signs. Do not spend the response budget repeating the same idea in different wording.
+- Each evidence item must add a separate material fact, not repeat or lightly rephrase the headline or another item. Use separate documents/publishers when the source pack allows it; include primary disclosures when available. Do not fill the evidence list with several observations from the same rating rationale.
+- Every evidence quote must be copied verbatim from the supplied excerpts and be at least 15 characters long. The application independently verifies each quote before displaying it.
+- Treat calculations as a priority: check the excerpts for comparable values over time, especially net interest margin, net interest income, advances/deposits, gross or net NPA, credit cost, provisions, profit and capital ratios when applicable. Return at least one calculation whenever two comparable, source-supported values are present; do not leave the array empty just to avoid arithmetic.
+- Prefer values from official quarterly results, annual reports or investor presentations. Include exact quotations with values, units and periods; the two figures may come from different passages in the same filing if both passages are present in the supplied excerpts.
+- The application independently calculates the result. Include a calculation only when both figures, comparable units and distinct reporting periods are supported by source text. Never infer a missing value or use illustrative numbers as real data.
 - Copy enough of each source sentence into priorQuote and currentQuote to preserve the exact number, unit and reporting period. Accept equivalent unit wording only when the source itself supports it. If values or units are missing or incomparable, return an empty calculationCandidates array.
 - Every timeline event must include an exact source quotation that contains the date or reporting period and supports the event. The application independently checks the quotation and date against retrieved source text.
 - Use only dates/period labels explicitly present in the quoted source passage. Omit timeline items whose date cannot be tied to an exact quote; never estimate or infer a date.
