@@ -40,6 +40,13 @@ export function errorResponse(error: unknown) {
       message.startsWith('Invalid SAKURA Gemini daily limit.') ||
       message.startsWith('Invalid SAKURA daily limit for ') ||
       message.startsWith('Invalid SAKURA_RESEARCH_PROVIDER.') ||
+      message.startsWith('EXA_API_KEY is not configured') ||
+      message.startsWith('Invalid SAKURA_EXA_DAILY_LIMIT.') ||
+      message.startsWith('Exa authentication failed.') ||
+      message.startsWith('Exa credits or usage access are unavailable.') ||
+      message.startsWith('Exa rate or usage limit reached.') ||
+      message.startsWith('Exa web search failed (') ||
+      message.startsWith('Daily Exa search allowance reached.') ||
       message.startsWith('Gemini research is selected but GEMINI_API_KEY is not configured') ||
       message.startsWith('No usable public sources were found after trying targeted searches.') ||
       message.startsWith('Search returned pages, but none contained usable independent source text.') ||
@@ -84,6 +91,9 @@ export function errorResponse(error: unknown) {
       const clientError = message.startsWith('Research session expired') ||
         message.startsWith('The selected research angle')
       const providerError = message.startsWith('Gemini research is selected but GEMINI_API_KEY is not configured') ||
+        message.startsWith('EXA_API_KEY is not configured') ||
+        message.startsWith('Exa authentication failed.') ||
+        message.startsWith('Exa web search failed (') ||
         message.startsWith('Gemini authentication failed') ||
         message.startsWith('Gemini could not find model') ||
         message.startsWith('Gemini rejected the research request') ||
@@ -105,6 +115,9 @@ export function errorResponse(error: unknown) {
         message.startsWith('Gemini rate or usage limit reached') ||
         message.startsWith('Daily Groq analysis allowance reached') ||
         message.startsWith('Daily Tavily search allowance reached') ||
+        message.startsWith('Daily Exa search allowance reached') ||
+        message.startsWith('Exa rate or usage limit reached.') ||
+        message.startsWith('Exa credits or usage access are unavailable.') ||
         message.startsWith('Groq rate or usage limit reached')
       return NextResponse.json(
         { error: message },
