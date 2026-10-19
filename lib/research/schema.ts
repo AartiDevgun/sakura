@@ -180,4 +180,39 @@ export const feedbackResponseSchema = z.object({
 
 export type FeedbackResponse = z.infer<typeof feedbackResponseSchema>
 
+
+export const peerComparisonRequestSchema = z.object({
+  researchId: z.string().min(1).max(200),
+  company: companyInputSchema,
+  angleId: z.string().min(1).max(200),
+  discoveryHeadline: z.string().trim().min(1).max(600),
+  discoverySummary: z.string().trim().min(1).max(2500),
+  thesis: z.string().trim().min(1).max(4000),
+})
+export type PeerComparisonRequest = z.infer<typeof peerComparisonRequestSchema>
+
+export const peerComparisonPeerSchema = z.object({
+  company: z.string().min(1).max(160),
+  relationship: z.enum(['direct_competitor', 'similar_business_model', 'adjacent_peer']),
+  assessment: z.string().min(1),
+  comparisonPoint: z.string().min(1),
+  evidence: z.array(evidenceClaimSchema).max(4),
+})
+export type PeerComparisonPeer = z.infer<typeof peerComparisonPeerSchema>
+
+export const peerComparisonResponseSchema = z.object({
+  mode: backendModeSchema,
+  comparisonId: z.string().min(1),
+  company: z.string().min(1),
+  issue: z.string().min(1),
+  outcome: z.enum(['company_specific', 'peer_shared', 'industry_wide', 'inconclusive']),
+  outcomeRationale: z.string().min(1),
+  comparisonBasis: z.string().min(1),
+  peers: z.array(peerComparisonPeerSchema).max(3),
+  differences: z.array(z.string().min(1)).max(5),
+  limitations: z.array(z.string().min(1)).max(6),
+  sources: z.array(sourceSchema),
+})
+export type PeerComparisonResponse = z.infer<typeof peerComparisonResponseSchema>
+
 export type ApiError = { error: string }
