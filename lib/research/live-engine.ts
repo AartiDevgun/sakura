@@ -1593,7 +1593,12 @@ Rules:
 
 
 
-function evidenceFromSearchResults(company: string, candidates: SearchResult[], limit = 6): Evidence[] {
+function evidenceFromSearchResults(
+  company: string,
+  candidates: SearchResult[],
+  limit = 6,
+  issuerDomains: string[] = [],
+): Evidence[] {
   const unique = new Map<string, Evidence>()
   for (const item of candidates) {
     if (!item.url || !item.title) continue
@@ -1612,7 +1617,9 @@ function evidenceFromSearchResults(company: string, candidates: SearchResult[], 
     const content = text(item.raw_content, text(item.content))
     if (!content) continue
     const host = url.hostname.toLowerCase().replace(/^www\./, '')
-    const classification = classifySource(host, company)
+    const classification: SourceClassification = matchesDomain(host, issuerDomains)
+      ? { sourceType: 'other', sourceTier: 'primary' }
+      : classifySource(host, company)
     const candidate: Evidence = {
       source: {
         id: '',
@@ -1660,6 +1667,88 @@ function sourceMentionsEntity(source: Evidence, company: string): boolean {
   const expected = comparableEntityName(company)
   if (!expected || expected.length < 3) return false
   return comparableEntityName(source.source.title + ' ' + source.content).includes(expected)
+}
+
+type PeerRelationship = 'direct_competitor' | 'similar_business_model' | 'adjacent_peer'
+type FinancialPeerCandidate = {
+  company: string
+  aliases: string[]
+  issuerDomains: string[]
+  relationship: PeerRelationship
+}
+
+const FINANCIAL_PEER_UNIVERSE: Record<string, FinancialPeerCandidate[]> = {
+  SHRIRAMFIN: [
+    { company: 'Cholamandalam Investment and Finance Company', aliases: ['Cholamandalam Investment and Finance Company Limited', 'Cholamandalam Finance', 'Chola Finance', 'Cholamandalam'], issuerDomains: ['cholamandalam.com'], relationship: 'similar_business_model' },
+    { company: 'Mahindra & Mahindra Financial Services', aliases: ['Mahindra Finance', 'Mahindra & Mahindra Financial Services Limited'], issuerDomains: ['mahindrafinance.com'], relationship: 'similar_business_model' },
+    { company: 'Bajaj Finance', aliases: ['Bajaj Finance Limited'], issuerDomains: ['bajajfinance.in'], relationship: 'similar_business_model' },
+  ],
+  BAJFINANCE: [
+    { company: 'Cholamandalam Investment and Finance Company', aliases: ['Cholamandalam Investment and Finance Company Limited', 'Cholamandalam Finance', 'Chola Finance', 'Cholamandalam'], issuerDomains: ['cholamandalam.com'], relationship: 'similar_business_model' },
+    { company: 'Shriram Finance', aliases: ['Shriram Finance Limited'], issuerDomains: ['shriramfinance.in', 'shriramfinance.com'], relationship: 'similar_business_model' },
+  ],
+  BAJAJFINSV: [
+    { company: 'Jio Financial Services', aliases: ['Jio Financial Services Limited', 'Jio Financial'], issuerDomains: ['jiofin.co.in', 'jiofinancialservices.com'], relationship: 'adjacent_peer' },
+    { company: 'Bajaj Finance', aliases: ['Bajaj Finance Limited'], issuerDomains: ['bajajfinance.in'], relationship: 'similar_business_model' },
+  ],
+  JIOFIN: [
+    { company: 'Bajaj Finserv', aliases: ['Bajaj Finserv Limited'], issuerDomains: ['bajajfinserv.in'], relationship: 'adjacent_peer' },
+    { company: 'Bajaj Finance', aliases: ['Bajaj Finance Limited'], issuerDomains: ['bajajfinance.in'], relationship: 'adjacent_peer' },
+  ],
+  AXISBANK: [
+    { company: 'HDFC Bank', aliases: ['HDFC Bank Limited'], issuerDomains: ['hdfcbank.com'], relationship: 'direct_competitor' },
+    { company: 'ICICI Bank', aliases: ['ICICI Bank Limited'], issuerDomains: ['icicibank.com'], relationship: 'direct_competitor' },
+  ],
+  HDFCBANK: [
+    { company: 'ICICI Bank', aliases: ['ICICI Bank Limited'], issuerDomains: ['icicibank.com'], relationship: 'direct_competitor' },
+    { company: 'Axis Bank', aliases: ['Axis Bank Limited'], issuerDomains: ['axisbank.com'], relationship: 'direct_competitor' },
+  ],
+  ICICIBANK: [
+    { company: 'HDFC Bank', aliases: ['HDFC Bank Limited'], issuerDomains: ['hdfcbank.com'], relationship: 'direct_competitor' },
+    { company: 'Axis Bank', aliases: ['Axis Bank Limited'], issuerDomains: ['axisbank.com'], relationship: 'direct_competitor' },
+  ],
+  KOTAKBANK: [
+    { company: 'HDFC Bank', aliases: ['HDFC Bank Limited'], issuerDomains: ['hdfcbank.com'], relationship: 'direct_competitor' },
+    { company: 'ICICI Bank', aliases: ['ICICI Bank Limited'], issuerDomains: ['icicibank.com'], relationship: 'direct_competitor' },
+  ],
+  INDU SIND: [],
+  SBIN: [
+    { company: 'HDFC Bank', aliases: ['HDFC Bank Limited'], issuerDomains: ['hdfcbank.com'], relationship: 'direct_competitor' },
+    { company: 'ICICI Bank', aliases: ['ICICI Bank Limited'], issuerDomains: ['icicibank.com'], relationship: 'direct_competitor' },
+  ],
+  INDUSINDBK: [
+    { company: 'Axis Bank', aliases: ['Axis Bank Limited'], issuerDomains: ['axisbank.com'], relationship: 'direct_competitor' },
+    { company: 'HDFC Bank', aliases: ['HDFC Bank Limited'], issuerDomains: ['hdfcbank.com'], relationship: 'direct_competitor' },
+  ],
+  HDFCLIFE: [
+    { company: 'SBI Life Insurance', aliases: ['SBI Life Insurance Company Limited', 'SBI Life'], issuerDomains: ['sbilife.co.in'], relationship: 'direct_competitor' },
+    { company: 'ICICI Prudential Life Insurance', aliases: ['ICICI Prudential Life Insurance Company Limited', 'ICICI Prudential Life', 'ICICI Pru Life'], issuerDomains: ['iciciprulife.com'], relationship: 'direct_competitor' },
+  ],
+  SBILIFE: [
+    { company: 'HDFC Life Insurance', aliases: ['HDFC Life Insurance Company Limited', 'HDFC Life'], issuerDomains: ['hdfclife.com'], relationship: 'direct_competitor' },
+    { company: 'ICICI Prudential Life Insurance', aliases: ['ICICI Prudential Life Insurance Company Limited', 'ICICI Prudential Life', 'ICICI Pru Life'], issuerDomains: ['iciciprulife.com'], relationship: 'direct_competitor' },
+  ],
+}
+
+function knownFinancialPeers(company: string): FinancialPeerCandidate[] {
+  const profile = financialProfile(company)
+  if (!profile) return []
+  const subject = compactCompanyName(profile.displayName)
+  return (FINANCIAL_PEER_UNIVERSE[profile.ticker] ?? []).filter(peer =>
+    compactCompanyName(peer.company) !== subject &&
+    !peer.aliases.some(alias => compactCompanyName(alias) === compactCompanyName(profile.displayName)),
+  )
+}
+
+function sourceMentionsPeer(
+  source: Evidence,
+  peer: Pick<FinancialPeerCandidate, 'company' | 'aliases'>,
+): boolean {
+  const corpus = comparableEntityName(source.source.title + ' ' + source.content)
+  return [peer.company, ...peer.aliases].some(alias => {
+    const expected = comparableEntityName(alias)
+    return expected.length >= 3 && corpus.includes(expected)
+  })
 }
 
 function emptyPeerComparison(
@@ -1713,93 +1802,110 @@ export async function livePeerComparison(
     .slice(0, 3)
     .map(entry => entry.item)
 
-  // Keep this optional feature budget-friendly: one discovery search and at most
-  // two peer-specific searches. searchWeb reuses cached results and guards every fresh call.
-  const candidateQueries = [
-    '"' + input.company + '" ' + selectedAngle.title + ' comparable banks NBFC peers same financial metric reporting period India sector trend',
-  ]
-  const candidateBatches = await Promise.allSettled(candidateQueries.map(query => searchWeb(query, signal)))
-  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-  const candidateResults = candidateBatches.flatMap(batch => batch.status === 'fulfilled' ? batch.value : [])
-  const candidateEvidence = evidenceFromSearchResults(input.company, candidateResults, 10)
-  const candidateFailures = candidateBatches
-    .filter((batch): batch is PromiseRejectedResult => batch.status === 'rejected')
-    .map(batch => batch.reason instanceof Error ? batch.reason.message : 'A peer-discovery search failed.')
+  // Curated peers are search seeds, not proof. Every peer must pass a separate search
+  // and its own exact-quote verification before it can influence the conclusion.
+  type SelectedPeer = FinancialPeerCandidate & { reason: string; sourceIndex?: number }
+  const candidateEvidence: Evidence[] = []
+  const candidateFailures: string[] = []
+  const peers: SelectedPeer[] = []
+  const knownPeers = knownFinancialPeers(input.company)
+
+  if (knownPeers.length > 0) {
+    peers.push(...knownPeers.slice(0, 2).map(peer => ({
+      ...peer,
+      reason: 'Selected as a candidate peer from SAKURA’s financial-company peer map; performance claims must still be verified from this company’s own sources.',
+    })))
+  } else {
+    const candidateQueries = [
+      '"' + input.company + '" ' + selectedAngle.title + ' comparable banks NBFC peers same financial metric reporting period India sector trend',
+    ]
+    const candidateBatches = await Promise.allSettled(candidateQueries.map(query => searchWeb(query, signal)))
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+    const candidateResults = candidateBatches.flatMap(batch => batch.status === 'fulfilled' ? batch.value : [])
+    candidateEvidence.push(...evidenceFromSearchResults(input.company, candidateResults, 10))
+    candidateFailures.push(
+      ...candidateBatches
+        .filter((batch): batch is PromiseRejectedResult => batch.status === 'rejected')
+        .map(batch => batch.reason instanceof Error ? batch.reason.message : 'A peer-discovery search failed.'),
+    )
+
+    if (candidateEvidence.length > 0) {
+      const candidateContext = candidateEvidence.map((item, sourceIndex) => ({
+        sourceIndex,
+        title: item.source.title,
+        url: item.source.url,
+        publisher: item.source.publisher,
+        excerpt: sourceExcerpt(item.content, 900),
+      }))
+      const peerPlan = await askForJson(
+        RESEARCH_SYSTEM,
+        [
+          'Find a small, defensible peer group for a cross-company financial comparison.',
+          'Company under investigation: ' + input.company,
+          'Research angle: ' + selectedAngle.title,
+          'Issue being tested (a lead from the current report, not a verified fact by itself): ' + input.discoveryHeadline,
+          'Context summary (use for search context, not as evidence): ' + input.discoverySummary,
+          'Select up to two comparable companies. Prefer similar business models and risk drivers; compare lenders with lenders, insurers with insurers, and other financial-services firms only with genuinely comparable firms.',
+          'Only choose names explicitly mentioned in the supplied source excerpts, and cite the sourceIndex where each name is explicitly mentioned. Do not invent company names or assume peers share the issue.',
+          'Candidate discovery sources:',
+          JSON.stringify(candidateContext),
+          'Return JSON only in this shape: {"peers":[{"company":"Exact company name as shown in source","relationship":"direct_competitor | similar_business_model | adjacent_peer","reason":"Why its business model is relevant","sourceIndex":0}]}',
+          'Choose up to two where evidence allows. Return fewer if there are not enough credible candidates.',
+        ].join('\n\n'),
+        signal,
+      )
+
+      const seenNames = new Set<string>()
+      for (const value of (Array.isArray(peerPlan.peers) ? peerPlan.peers : []).slice(0, 5)) {
+        const item = record(value)
+        const name = text(item.company).slice(0, 160)
+        const sourceIndex = validIndex(item.sourceIndex, candidateEvidence.length)
+        const relationship = item.relationship
+        const normalized = comparableEntityName(name)
+        if (
+          !name || sourceIndex === undefined ||
+          normalized === comparableEntityName(input.company) ||
+          seenNames.has(normalized) ||
+          !sourceMentionsEntity(candidateEvidence[sourceIndex], name) ||
+          !['direct_competitor', 'similar_business_model', 'adjacent_peer'].includes(String(relationship))
+        ) continue
+        seenNames.add(normalized)
+        peers.push({
+          company: name,
+          aliases: [name],
+          issuerDomains: [],
+          relationship: relationship as PeerRelationship,
+          reason: text(item.reason, 'The retrieved source suggests a potentially comparable business model.'),
+          sourceIndex,
+        })
+        if (peers.length >= 2) break
+      }
+    }
+  }
+
   const baselineSources = anchorEvidence.map((item, index) => ({ ...item.source, id: 'peer-source-' + (index + 1) }))
-
-  if (candidateEvidence.length === 0) {
-    return emptyPeerComparison(input.company, issue, baselineSources, [
-      'SAKURA could not retrieve peer-discovery sources for this comparison.',
-      ...candidateFailures.slice(0, 2),
-      'No conclusion about company-specific versus wider-sector exposure has been drawn.',
-    ])
-  }
-
-  const candidateContext = candidateEvidence.map((item, sourceIndex) => ({
-    sourceIndex,
-    title: item.source.title,
-    url: item.source.url,
-    publisher: item.source.publisher,
-    excerpt: sourceExcerpt(item.content, 900),
-  }))
-  const peerPlan = await askForJson(
-    RESEARCH_SYSTEM,
-    [
-      'Find a small, defensible peer group for a cross-company financial comparison.',
-      'Company under investigation: ' + input.company,
-      'Research angle: ' + selectedAngle.title,
-      'Issue being tested (a lead from the current report, not a verified fact by itself): ' + input.discoveryHeadline,
-      'Context summary (use for search context, not as evidence): ' + input.discoverySummary,
-      'Select up to two comparable companies. Prefer similar business models and risk drivers; compare lenders with lenders, insurers with insurers, and other financial-services firms only with genuinely comparable firms.',
-      'Only choose names explicitly mentioned in the supplied source excerpts, and cite the sourceIndex where each name is explicitly mentioned. Do not invent company names or assume peers share the issue.',
-      'Candidate discovery sources:',
-      JSON.stringify(candidateContext),
-      'Return JSON only in this shape: {"peers":[{"company":"Exact company name as shown in source","relationship":"direct_competitor | similar_business_model | adjacent_peer","reason":"Why its business model is relevant","sourceIndex":0}]}',
-      'Choose up to two where evidence allows. Return fewer if there are not enough credible candidates.',
-    ].join('\n\n'),
-    signal,
-  )
-
-  const peers: { company: string; relationship: 'direct_competitor' | 'similar_business_model' | 'adjacent_peer'; reason: string; sourceIndex: number }[] = []
-  const seenNames = new Set<string>()
-  for (const value of (Array.isArray(peerPlan.peers) ? peerPlan.peers : []).slice(0, 5)) {
-    const item = record(value)
-    const name = text(item.company).slice(0, 160)
-    const sourceIndex = validIndex(item.sourceIndex, candidateEvidence.length)
-    const relationship = item.relationship
-    const normalized = comparableEntityName(name)
-    if (
-      !name || sourceIndex === undefined ||
-      normalized === comparableEntityName(input.company) ||
-      seenNames.has(normalized) ||
-      !sourceMentionsEntity(candidateEvidence[sourceIndex], name) ||
-      !['direct_competitor', 'similar_business_model', 'adjacent_peer'].includes(String(relationship))
-    ) continue
-    seenNames.add(normalized)
-    peers.push({
-      company: name,
-      relationship: relationship as 'direct_competitor' | 'similar_business_model' | 'adjacent_peer',
-      reason: text(item.reason, 'The retrieved source suggests a potentially comparable business model.'),
-      sourceIndex,
-    })
-    if (peers.length >= 2) break
-  }
-
   if (peers.length === 0) {
     return emptyPeerComparison(input.company, issue, baselineSources, [
-      'Search results did not establish a defensible peer group whose company names could be verified in the retrieved excerpts.',
+      candidateEvidence.length === 0
+        ? 'No usable peer-discovery sources were retrieved, so SAKURA could not identify evidence-backed comparison candidates.'
+        : 'Search results did not establish a peer group whose company names could be verified in the retrieved excerpts.',
+      ...candidateFailures.slice(0, 2),
       'SAKURA will not label an issue company-specific merely because comparable evidence was missing.',
     ])
   }
 
   const peerSearches = await Promise.all(peers.map(async peer => {
     try {
-      const query = ('"' + peer.company + '" ' + selectedAngle.title + ' ' + input.discoveryHeadline + ' latest quarterly results annual report financial statements official filing')
+      const query = (targetedFinancialQuery(peer.company, selectedAngle.title + ' ' + input.discoveryHeadline) + ' quarterly results annual report investor presentation exchange filing')
         .replace(/\s+/g, ' ')
         .slice(0, 420)
       const results = await searchWeb(query, signal)
-      const usable = evidenceFromSearchResults(peer.company, results, 6)
-        .filter(item => sourceMentionsEntity(item, peer.company) || likelyIssuerDomain(item.host, peer.company))
+      const usable = evidenceFromSearchResults(peer.company, results, 6, peer.issuerDomains)
+        .filter(item =>
+          sourceMentionsPeer(item, peer) ||
+          likelyIssuerDomain(item.host, peer.company) ||
+          matchesDomain(item.host, peer.issuerDomains),
+        )
         .slice(0, 3)
       return { peer, evidence: usable, error: '' }
     } catch (error) {
@@ -1812,7 +1918,8 @@ export async function livePeerComparison(
   const groups: { owner: string; evidence: Evidence[] }[] = []
   if (anchorEvidence.length) groups.push({ owner: input.company, evidence: anchorEvidence })
   const peerContextEvidence = peers
-    .map(peer => candidateEvidence[peer.sourceIndex])
+    .map(peer => peer.sourceIndex === undefined ? undefined : candidateEvidence[peer.sourceIndex])
+    .filter((item): item is Evidence => Boolean(item))
     .filter((item, index, items) => items.findIndex(candidate => candidate.source.url === item.source.url) === index)
     .slice(0, 3)
   if (peerContextEvidence.length) groups.push({ owner: 'peer-selection context', evidence: peerContextEvidence })
