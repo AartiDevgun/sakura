@@ -40,6 +40,7 @@ export function errorResponse(error: unknown) {
       message.startsWith('Invalid SAKURA Gemini daily limit.') ||
       message.startsWith('Invalid SAKURA daily limit for ') ||
       message.startsWith('Invalid SAKURA_RESEARCH_PROVIDER.') ||
+      message.startsWith('SAKURA is set to Groq-only mode, but GROQ_API_KEY is not configured') ||
       message.startsWith('EXA_API_KEY is not configured') ||
       message.startsWith('Invalid SAKURA_EXA_DAILY_LIMIT.') ||
       message.startsWith('Exa authentication failed.') ||
