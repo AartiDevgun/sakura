@@ -8,6 +8,8 @@ import type {
   EvidenceClaim,
   FollowupResponse,
   InvestigationResponse,
+  PeerComparisonRequest,
+  PeerComparisonResponse,
   ResearchResponse,
   Source,
   TimelineEvent,
@@ -1294,6 +1296,362 @@ Rules:
   return response
 }
 
+
+
+function evidenceFromSearchResults(company: string, candidates: SearchResult[], limit = 6): Evidence[] {
+  const unique = new Map<string, Evidence>()
+  for (const item of candidates) {
+    if (!item.url || !item.title) continue
+    let url: URL
+    try {
+      url = new URL(item.url)
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') continue
+    } catch {
+      continue
+    }
+    url.hash = ''
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(utm_|gclid$|fbclid$)/i.test(key)) url.searchParams.delete(key)
+    }
+    const canonicalUrl = url.toString()
+    const content = text(item.raw_content, text(item.content))
+    if (!content) continue
+    const host = url.hostname.toLowerCase().replace(/^www\./, '')
+    const classification = classifySource(host, company)
+    const candidate: Evidence = {
+      source: {
+        id: '',
+        title: item.title.trim().slice(0, 300),
+        url: canonicalUrl,
+        publisher: host,
+        publishedAt: text(item.published_date) || undefined,
+        accessedAt: new Date().toISOString(),
+        sourceType: classification.sourceType,
+        sourceTier: classification.sourceTier,
+      },
+      content: content.slice(0, 4500),
+      score: typeof item.score === 'number' ? item.score : 0,
+      host,
+    }
+    const current = unique.get(canonicalUrl)
+    if (!current || sourceQualityScore(candidate) > sourceQualityScore(current)) unique.set(canonicalUrl, candidate)
+  }
+
+  const ranked = [...unique.values()].sort((a, b) => sourceQualityScore(b) - sourceQualityScore(a))
+  const selected: Evidence[] = []
+  const hosts = new Map<string, number>()
+  let ratingCount = 0
+  for (const item of ranked) {
+    if ((hosts.get(item.host) ?? 0) >= 2) continue
+    const rating = isRatingRationale(item)
+    if (rating && ratingCount >= 1) continue
+    selected.push(item)
+    hosts.set(item.host, (hosts.get(item.host) ?? 0) + 1)
+    if (rating) ratingCount += 1
+    if (selected.length >= limit) break
+  }
+  return selected
+}
+
+function comparableEntityName(value: string): string {
+  return value.toLowerCase()
+    .replace(/\b(?:limited|ltd|private|pvt|incorporated|inc|corporation|corp|company|co)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function sourceMentionsEntity(source: Evidence, company: string): boolean {
+  const expected = comparableEntityName(company)
+  if (!expected || expected.length < 3) return false
+  return comparableEntityName(source.source.title + ' ' + source.content).includes(expected)
+}
+
+function emptyPeerComparison(
+  company: string,
+  issue: string,
+  sources: Source[],
+  limitations: string[],
+): PeerComparisonResponse {
+  return {
+    mode: 'live',
+    comparisonId: 'peer-comparison-' + randomUUID(),
+    company,
+    issue,
+    outcome: 'inconclusive',
+    outcomeRationale: 'The available evidence does not support a reliable conclusion about whether this issue is company-specific or shared by comparable companies.',
+    comparisonBasis: 'A peer comparison requires relevant companies, aligned metrics, comparable reporting periods and direct source evidence.',
+    peers: [],
+    differences: [],
+    limitations: limitations.length ? limitations : ['Insufficient comparable public evidence was retrieved. No conclusion has been drawn.'],
+    sources,
+  }
+}
+
+/** User-triggered comparison. Every fresh public-web search passes through searchWeb's budget guard. */
+export async function livePeerComparison(
+  input: PeerComparisonRequest,
+  signal?: AbortSignal,
+): Promise<PeerComparisonResponse> {
+  const session = await getJson<ResearchSession>('research-session', input.researchId)
+  if (!session || session.company.trim().toLowerCase() !== input.company.trim().toLowerCase()) {
+    throw new Error('Research session expired or does not match this company. Run the company search again.')
+  }
+  const selectedAngle = session.response.angles.find(angle => angle.id === input.angleId)
+  if (!selectedAngle) throw new Error('The selected research angle is not part of this research session. Please search again.')
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+
+  const issue = input.discoveryHeadline.trim()
+  const queryContext = (selectedAngle.title + ' ' + input.discoveryHeadline + ' ' + input.discoverySummary).slice(0, 600)
+  const keywords = new Set(
+    comparableEntityName(queryContext).split(' ').filter(word =>
+      word.length > 3 && !['that', 'this', 'with', 'from', 'into', 'over', 'under', 'company', 'financial', 'evidence', 'possible', 'potential'].includes(word),
+    ).slice(0, 12),
+  )
+  const anchorEvidence = [...session.evidence]
+    .map(item => {
+      const corpus = comparableEntityName(item.source.title + ' ' + item.content.slice(0, 1800))
+      const relevance = [...keywords].reduce((count, word) => count + (corpus.includes(word) ? 1 : 0), 0)
+      return { item, score: relevance * 1.1 + sourceQualityScore(item) }
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map(entry => entry.item)
+
+  const candidateQueries = [
+    '"' + input.company + '" comparable companies competitors same business model ' + selectedAngle.title + ' India',
+    '"' + input.company + '" peer group sector competitors banks NBFC financial services annual results',
+  ]
+  const candidateBatches = await Promise.allSettled(candidateQueries.map(query => searchWeb(query, signal)))
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+  const candidateResults = candidateBatches.flatMap(batch => batch.status === 'fulfilled' ? batch.value : [])
+  const candidateEvidence = evidenceFromSearchResults(input.company, candidateResults, 10)
+  const candidateFailures = candidateBatches
+    .filter((batch): batch is PromiseRejectedResult => batch.status === 'rejected')
+    .map(batch => batch.reason instanceof Error ? batch.reason.message : 'A peer-discovery search failed.')
+  const baselineSources = anchorEvidence.map((item, index) => ({ ...item.source, id: 'peer-source-' + (index + 1) }))
+
+  if (candidateEvidence.length === 0) {
+    return emptyPeerComparison(input.company, issue, baselineSources, [
+      'SAKURA could not retrieve peer-discovery sources for this comparison.',
+      ...candidateFailures.slice(0, 2),
+      'No conclusion about company-specific versus wider-sector exposure has been drawn.',
+    ])
+  }
+
+  const candidateContext = candidateEvidence.map((item, sourceIndex) => ({
+    sourceIndex,
+    title: item.source.title,
+    url: item.source.url,
+    publisher: item.source.publisher,
+    excerpt: sourceExcerpt(item.content, 900),
+  }))
+  const peerPlan = await askForJson(
+    RESEARCH_SYSTEM,
+    [
+      'Find a small, defensible peer group for a cross-company financial comparison.',
+      'Company under investigation: ' + input.company,
+      'Research angle: ' + selectedAngle.title,
+      'Issue being tested (a lead from the current report, not a verified fact by itself): ' + input.discoveryHeadline,
+      'Context summary (use for search context, not as evidence): ' + input.discoverySummary,
+      'Select up to three comparable companies. Prefer similar business models and risk drivers; compare lenders with lenders, insurers with insurers, and other financial-services firms only with genuinely comparable firms.',
+      'Only choose names explicitly mentioned in the supplied source excerpts, and cite the sourceIndex where each name is explicitly mentioned. Do not invent company names or assume peers share the issue.',
+      'Candidate discovery sources:',
+      JSON.stringify(candidateContext),
+      'Return JSON only in this shape: {"peers":[{"company":"Exact company name as shown in source","relationship":"direct_competitor | similar_business_model | adjacent_peer","reason":"Why its business model is relevant","sourceIndex":0}]}',
+      'Choose two or three where evidence allows. Return fewer if there are not enough credible candidates.',
+    ].join('\n\n'),
+    signal,
+  )
+
+  const peers: { company: string; relationship: 'direct_competitor' | 'similar_business_model' | 'adjacent_peer'; reason: string; sourceIndex: number }[] = []
+  const seenNames = new Set<string>()
+  for (const value of (Array.isArray(peerPlan.peers) ? peerPlan.peers : []).slice(0, 5)) {
+    const item = record(value)
+    const name = text(item.company).slice(0, 160)
+    const sourceIndex = validIndex(item.sourceIndex, candidateEvidence.length)
+    const relationship = item.relationship
+    const normalized = comparableEntityName(name)
+    if (
+      !name || sourceIndex === undefined ||
+      normalized === comparableEntityName(input.company) ||
+      seenNames.has(normalized) ||
+      !sourceMentionsEntity(candidateEvidence[sourceIndex], name) ||
+      !['direct_competitor', 'similar_business_model', 'adjacent_peer'].includes(String(relationship))
+    ) continue
+    seenNames.add(normalized)
+    peers.push({
+      company: name,
+      relationship: relationship as 'direct_competitor' | 'similar_business_model' | 'adjacent_peer',
+      reason: text(item.reason, 'The retrieved source suggests a potentially comparable business model.'),
+      sourceIndex,
+    })
+    if (peers.length >= 3) break
+  }
+
+  if (peers.length === 0) {
+    return emptyPeerComparison(input.company, issue, baselineSources, [
+      'Search results did not establish a defensible peer group whose company names could be verified in the retrieved excerpts.',
+      'SAKURA will not label an issue company-specific merely because comparable evidence was missing.',
+    ])
+  }
+
+  const peerSearches = await Promise.all(peers.map(async peer => {
+    try {
+      const query = ('"' + peer.company + '" ' + selectedAngle.title + ' ' + input.discoveryHeadline + ' latest quarterly results annual report financial statements official filing')
+        .replace(/\s+/g, ' ')
+        .slice(0, 420)
+      const results = await searchWeb(query, signal)
+      const usable = evidenceFromSearchResults(peer.company, results, 6)
+        .filter(item => sourceMentionsEntity(item, peer.company) || likelyIssuerDomain(item.host, peer.company))
+        .slice(0, 3)
+      return { peer, evidence: usable, error: '' }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') throw error
+      return { peer, evidence: [] as Evidence[], error: error instanceof Error ? error.message : 'Peer-specific search failed.' }
+    }
+  }))
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+
+  const groups: { owner: string; evidence: Evidence[] }[] = []
+  if (anchorEvidence.length) groups.push({ owner: input.company, evidence: anchorEvidence })
+  const peerContextEvidence = peers
+    .map(peer => candidateEvidence[peer.sourceIndex])
+    .filter((item, index, items) => items.findIndex(candidate => candidate.source.url === item.source.url) === index)
+    .slice(0, 3)
+  if (peerContextEvidence.length) groups.push({ owner: 'peer-selection context', evidence: peerContextEvidence })
+  for (const entry of peerSearches) {
+    if (entry.evidence.length) groups.push({ owner: entry.peer.company, evidence: entry.evidence })
+  }
+
+  const compareSources: Evidence[] = []
+  const ownerBySourceId = new Map<string, string>()
+  const seenUrls = new Set<string>()
+  for (const group of groups) {
+    for (const item of group.evidence) {
+      if (seenUrls.has(item.source.url)) continue
+      seenUrls.add(item.source.url)
+      const cloned: Evidence = {
+        ...item,
+        source: { ...item.source, id: 'peer-source-' + (compareSources.length + 1) },
+      }
+      compareSources.push(cloned)
+      ownerBySourceId.set(cloned.source.id, group.owner)
+    }
+  }
+
+  const baseLimitations = [
+    'Peer comparisons are provisional; different business models, accounting definitions and reporting periods can make metrics non-comparable.',
+    'Public-web evidence can be incomplete or delayed. A missing disclosure is not evidence that a company does not have the issue.',
+    ...candidateFailures.slice(0, 1),
+    ...peerSearches.map(entry => entry.error).filter(Boolean).slice(0, 2),
+  ]
+  const evidencePayload = compareSources.map((item, sourceIndex) => ({
+    sourceIndex,
+    companyAssociation: ownerBySourceId.get(item.source.id) || 'unknown',
+    title: item.source.title,
+    url: item.source.url,
+    publisher: item.source.publisher,
+    publishedAt: item.source.publishedAt ?? null,
+    sourceType: item.source.sourceType ?? 'other',
+    sourceTier: item.source.sourceTier ?? 'unverified',
+    excerpt: sourceExcerpt(item.content, 1000),
+  }))
+
+  const result = await askForJson(
+    RESEARCH_SYSTEM,
+    [
+      'Determine whether the issue raised by the current discovery appears unique to ' + input.company + ' or also present in comparable companies.',
+      'Company: ' + input.company,
+      'Research angle: ' + selectedAngle.title,
+      'Discovery headline (lead to test, NOT evidence on its own): ' + input.discoveryHeadline,
+      'Discovery summary (lead to test, NOT evidence on its own): ' + input.discoverySummary,
+      'Original thesis (context only; do not accept without source support): ' + input.thesis,
+      'The source field companyAssociation identifies which company a source is about. "peer-selection context" supports only why a peer was considered; it is not evidence that the issue occurs at that peer.',
+      'Use ONLY supplied source excerpts. Never infer peer performance from anchor-company evidence. For each peer, link evidence to that peer own source passages. Compare like with like: same metric where possible, equivalent units and aligned reporting periods.',
+      'If metrics or periods cannot be aligned, say so explicitly. Do not claim the issue is absent or more severe merely because data is missing.',
+      'Classify conservatively: company_specific requires at least two adequately reviewed peers and evidence that the issue is materially absent or meaningfully different; peer_shared requires at least one peer source supporting the same issue; industry_wide requires several peers plus reliable source evidence explicitly describing a broader sector trend; otherwise use inconclusive.',
+      'Do not overstate causality. Explain how the subject company differs only when sources justify it.',
+      'Retrieved sources:',
+      JSON.stringify(evidencePayload),
+      'Return JSON with this shape:',
+      '{"outcome":"company_specific | peer_shared | industry_wide | inconclusive","outcomeRationale":"Evidence-led explanation and limits","comparisonBasis":"Metrics and periods compared or why they are not comparable","peers":[{"company":"Exact selected peer name","relationship":"direct_competitor | similar_business_model | adjacent_peer","assessment":"Peer-specific source-backed assessment","comparisonPoint":"Like-for-like comparison, or why it could not be made","evidence":[{"claim":"Peer-specific observation","quote":"Exact source quotation","sourceIndex":0,"date":"Source period or empty string"}]}],"differences":["Source-backed differences"],"limitations":["Specific gaps"]}',
+      'Return at most three peer rows. Each evidence quote must be verbatim, at least 15 characters, and use a valid sourceIndex. Peer evidence MUST cite a source whose companyAssociation is that exact peer—not the anchor or peer-selection context. Never invent values, dates, URLs or causal explanations. Prefer "inconclusive" over a confident guess.',
+    ].join('\n\n'),
+    signal,
+  )
+
+  const validatedPeers = peers.map(peer => {
+    const rawPeer = (Array.isArray(result.peers) ? result.peers : [])
+      .map(record)
+      .find(item => comparableEntityName(text(item.company)) === comparableEntityName(peer.company))
+    const verifiedEvidence: EvidenceClaim[] = []
+    if (rawPeer && Array.isArray(rawPeer.evidence)) {
+      for (const rawEvidence of rawPeer.evidence.slice(0, 4)) {
+        const item = record(rawEvidence)
+        const sourceIndex = validIndex(item.sourceIndex, compareSources.length)
+        const quote = text(item.quote)
+        const claim = text(item.claim)
+        if (
+          sourceIndex === undefined || !claim ||
+          !quoteIsPresent(compareSources[sourceIndex].content, quote) ||
+          ownerBySourceId.get(compareSources[sourceIndex].source.id) !== peer.company
+        ) continue
+        verifiedEvidence.push({
+          claim,
+          quote,
+          sourceId: compareSources[sourceIndex].source.id,
+          date: text(item.date) || undefined,
+        })
+      }
+    }
+    return {
+      company: peer.company,
+      relationship: peer.relationship,
+      assessment: verifiedEvidence.length && rawPeer
+        ? text(rawPeer.assessment, 'Evidence is available, but the issue comparison remains uncertain.')
+        : 'No sufficiently relevant, source-verified evidence was retrieved for this peer. No conclusion is drawn.',
+      comparisonPoint: verifiedEvidence.length && rawPeer
+        ? text(rawPeer.comparisonPoint, 'A like-for-like metric comparison was not established.')
+        : 'No defensible metric-and-period comparison was available.',
+      evidence: verifiedEvidence,
+    }
+  })
+
+  const supportedPeerCount = validatedPeers.filter(peer => peer.evidence.length > 0).length
+  const statedOutcome = ['company_specific', 'peer_shared', 'industry_wide', 'inconclusive'].includes(String(result.outcome))
+    ? result.outcome as PeerComparisonResponse['outcome']
+    : 'inconclusive'
+  let outcome: PeerComparisonResponse['outcome'] = statedOutcome
+  if (supportedPeerCount === 0) outcome = 'inconclusive'
+  else if (outcome === 'company_specific' && supportedPeerCount < 2) outcome = 'inconclusive'
+  else if (outcome === 'industry_wide' && supportedPeerCount < 3) outcome = 'peer_shared'
+
+  const responseSources = compareSources.map(item => item.source)
+  const modelLimitations = Array.isArray(result.limitations)
+    ? result.limitations.filter((value): value is string => typeof value === 'string' && value.trim()).slice(0, 4)
+    : []
+  const limitations = [...new Set([...baseLimitations, ...modelLimitations])].slice(0, 6)
+  const differences = Array.isArray(result.differences)
+    ? result.differences.filter((value): value is string => typeof value === 'string' && value.trim()).slice(0, 5)
+    : []
+
+  return {
+    mode: 'live',
+    comparisonId: 'peer-comparison-' + randomUUID(),
+    company: input.company.trim(),
+    issue,
+    outcome,
+    outcomeRationale: outcome === 'inconclusive' && statedOutcome !== 'inconclusive'
+      ? 'The proposed classification was more definite than the source-verified peer evidence allows. The comparison remains inconclusive.'
+      : text(result.outcomeRationale, 'The available evidence does not establish a definitive peer comparison.'),
+    comparisonBasis: text(result.comparisonBasis, 'Reporting periods and metric definitions must be aligned before making a like-for-like comparison.'),
+    peers: validatedPeers,
+    differences,
+    limitations,
+    sources: responseSources,
+  }
+}
 
 export async function liveFollowup(
   company: string,
