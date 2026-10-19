@@ -114,7 +114,6 @@ export function PeerComparisonPanel({
           {loading ? <LoaderCircle size={16} className="animate-spin" /> : <Search size={16} />}
           {loading ? 'Comparing public evidence…' : comparison ? 'Run comparison again' : 'Compare with relevant peers'}
         </button>
-        <p className="mt-2 text-[11px] leading-5 text-rose-100/35">This is a separate, on-demand research step. Fresh web searches are subject to SAKURA’s daily usage budget.</p>
       </div>
 
       {loading ? (
