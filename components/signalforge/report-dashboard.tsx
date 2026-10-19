@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { ArrowUpRight, BookOpen, CalendarDays, ChartNoAxesCombined, FlaskConical, MessageCircle, Network, Sparkles, type LucideIcon } from 'lucide-react'
 import type { BackendMode, InvestigationResponse, ResearchAngle, ResearchResponse } from '@/lib/research/schema'
+import { assessDiscovery, isVerifiedDiscovery } from '@/lib/research/discovery-quality'
 import { CounterargumentExplorer } from './counterargument-explorer'
 import { FollowupPanel } from './follow-up-panel'
 import { PeekRating } from './peek-rating'
@@ -63,6 +64,8 @@ export function ReportDashboard({
   const primaryCount = report.sources.filter(source => source.sourceTier === 'primary').length
   const independentPublisherCount = new Set(report.sources.map(source => { try { return new URL(source.url).hostname.replace(/^www\./, '').toLowerCase() } catch { return source.publisher?.toLowerCase() || source.id } })).size
   const confidenceLabel = discovery.confidence === 'high' ? 'Strong' : discovery.confidence === 'medium' ? 'Moderate' : 'Weak'
+  const verifiedCount = discoveries.filter(isVerifiedDiscovery).length
+  const selectedAssessment = assessDiscovery(investigation)
 
   return (
     <section className="space-y-5" aria-labelledby="research-report-heading">
@@ -73,11 +76,17 @@ export function ReportDashboard({
           <p className="mt-1 text-sm text-rose-100/45">Banking, NBFCs & financial services · Public-evidence investigation</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <StatChip label="Angles tested" value={String(discoveries.length) + " / " + String(research.angles.length)} />
+          <StatChip label="Verified findings" value={String(verifiedCount)} />
           <StatChip label="Sources" value={String(report.sources.length)} />
           <StatChip label="Primary" value={String(primaryCount)} />
           <StatChip label="Evidence strength" value={confidenceLabel} />
         </div>
+      </div>
+
+      <div className={"rounded-2xl px-4 py-3 text-xs leading-6 " + (verifiedCount === 0 ? "border border-amber-200/20 bg-amber-950/20 text-amber-100/80" : "border border-pink-200/10 bg-black/35 text-rose-100/55")}>
+        {verifiedCount === 0
+          ? "No tested angle met the minimum verification gate. The report below is a diagnostic candidate, not a verified discovery. " + selectedAssessment.reason
+          : "Showing " + verifiedCount + " verified discovery" + (verifiedCount === 1 ? "" : "ies") + ", ranked by attention priority and evidence strength. Each displayed discovery has at least two quoted claims across distinct publishers and a primary source cited directly."}
       </div>
 
       <div className="rounded-2xl border border-pink-200/10 bg-black/35 px-4 py-3 sm:flex sm:items-center sm:gap-4">
@@ -89,8 +98,8 @@ export function ReportDashboard({
         <JellyRadio
           angles={discoveryOptions}
           company={research.company}
-          heading="Other discoveries from this search"
-          description={`SAKURA tested ${discoveries.length} candidate angles. Select any discovery to switch the full report instantly—no additional research call is needed.`}
+          heading="Priority discoveries"
+          description={`These results passed source verification and are ranked by attention priority, then evidence strength. Select one to switch the full report instantly—no additional research call is needed.`}
           activeId={investigation.angleId}
           onSelect={onSelectDiscovery}
         />

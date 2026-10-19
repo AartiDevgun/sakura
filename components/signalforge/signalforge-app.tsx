@@ -7,9 +7,11 @@ import {
   type MockScenario,
   type ResearchResponse,
   type InvestigationResponse,
+  type ResearchAngle,
   researchResponseSchema,
   investigationResponseSchema,
 } from '@/lib/research/schema'
+import { isVerifiedDiscovery, rankDiscoveries } from '@/lib/research/discovery-quality'
 import { cn } from '@/lib/utils'
 import { SakuraParticles } from '@/components/sakura-particles'
 import CrystalizedBall from '@/components/CrystalizedBall'
@@ -74,22 +76,6 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
     abortRef.current = null
   }
 
-  const scoreInvestigation = (investigation: InvestigationResponse) => {
-    const report = investigation.report
-    const independentPublishers = new Set(
-      report.sources.map(source => {
-        try { return new URL(source.url).hostname.replace(/^www\./, '').toLowerCase() }
-        catch { return source.publisher?.toLowerCase() || source.id }
-      }),
-    ).size
-    const confidenceScore = investigation.discovery.confidence === 'high' ? 3 : investigation.discovery.confidence === 'medium' ? 2 : 1
-    const verifiedClaims = report.evidence?.length ?? 0
-    const sourcedCounterarguments = report.counterarguments.filter(item => Boolean(item.sourceId)).length
-    return confidenceScore + Math.min(verifiedClaims, 5) + Math.min(independentPublishers, 4) +
-      report.calculations.length * 2 + Math.min(report.timeline.length, 3) * 0.5 +
-      sourcedCounterarguments * 0.75
-  }
-
   const runResearch = async (company: string) => {
     const signal = startRequest()
     setFlow({ step: 'researching', company })
@@ -100,50 +86,69 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
         return
       }
 
-      // Run only the three core Track A investigations automatically.
-      // Additional generated angles stay available through "Explore another angle",
-      // so a normal search doesn't spend model/search budget testing every candidate.
+      // Inspect five priority hypotheses by default: the three required Track A
+      // angles plus the two strongest company-specific candidates. Search/AI calls
+      // run in two small parallel batches to reduce elapsed time without launching
+      // every optional angle and consuming the whole daily allowance.
+      const priorityAngles = research.angles.slice(0, 5)
       const candidates: InvestigationResponse[] = []
       const errors: string[] = []
-      const anglesToTest = research.angles.slice(0, 3)
-      for (let index = 0; index < anglesToTest.length; index += 1) {
-        const angle = anglesToTest[index]
-        setFlow({ step: 'investigating', research, angleId: angle.id, angleIndex: index + 1, angleTotal: anglesToTest.length })
-        try {
-          const investigation = await postJson(
-            '/api/research/investigate',
-            { researchId: research.researchId, company: research.company, angleId: angle.id },
-            investigationResponseSchema,
-            { signal, mockScenario },
-          )
-          candidates.push(investigation)
-        } catch (error) {
-          if (isAbortError(error)) return
-          errors.push((error as Error).message)
+
+      const investigateBatch = async (angles: ResearchAngle[], offset: number) => {
+        if (angles.length === 0 || signal.aborted) return
+        setFlow({
+          step: 'investigating',
+          research,
+          angleId: angles[0].id,
+          angleIndex: offset + 1,
+          angleTotal: priorityAngles.length,
+        })
+        const settled = await Promise.allSettled(
+          angles.map(angle =>
+            postJson(
+              '/api/research/investigate',
+              { researchId: research.researchId, company: research.company, angleId: angle.id },
+              investigationResponseSchema,
+              { signal, mockScenario },
+            ),
+          ),
+        )
+        for (const result of settled) {
+          if (result.status === 'fulfilled') {
+            candidates.push(result.value)
+          } else if (!isAbortError(result.reason)) {
+            errors.push(result.reason instanceof Error ? result.reason.message : 'An investigation failed.')
+          }
         }
       }
 
+      await investigateBatch(priorityAngles.slice(0, 3), 0)
+      await investigateBatch(priorityAngles.slice(3, 5), 3)
+      if (signal.aborted) return
+
       if (candidates.length === 0) {
-        setFlow({ step: 'investigation-error', research, angleId: anglesToTest[0].id, message: errors[0] || 'No candidate angle could be investigated.' })
+        const firstAngle = priorityAngles[0] || research.angles[0]
+        setFlow({
+          step: 'investigation-error',
+          research,
+          angleId: firstAngle.id,
+          message: errors[0] || 'No candidate angle could be investigated.',
+        })
         return
       }
 
-      const confidenceRank = { high: 3, medium: 2, low: 1 } as const
-      const angleSignalRank = { strong: 3, moderate: 2, weak: 1 } as const
-      const ranked = [...candidates].sort((a, b) => {
-        const confidenceDifference = confidenceRank[b.discovery.confidence] - confidenceRank[a.discovery.confidence]
-        if (confidenceDifference !== 0) return confidenceDifference
-        const aSignal = research.angles.find(angle => angle.id === a.angleId)?.signalStrength || 'moderate'
-        const bSignal = research.angles.find(angle => angle.id === b.angleId)?.signalStrength || 'moderate'
-        const signalDifference = angleSignalRank[bSignal] - angleSignalRank[aSignal]
-        return signalDifference || scoreInvestigation(b) - scoreInvestigation(a)
-      })
-      setFlow({ step: 'result', research, investigation: ranked[0], discoveries: ranked })
+      const ranked = rankDiscoveries(candidates)
+      const verified = ranked.filter(isVerifiedDiscovery).slice(0, 5)
+      // If none passes, show one diagnostic report with an explicit warning instead
+      // of presenting an unsupported hypothesis as a verified discovery.
+      const displayed = verified.length > 0 ? verified : ranked.slice(0, 1)
+      setFlow({ step: 'result', research, investigation: displayed[0], discoveries: displayed })
     } catch (error) {
       if (isAbortError(error)) return
       setFlow({ step: 'research-error', company, message: (error as Error).message })
     }
   }
+
 
   const runInvestigation = async (research: ResearchResponse, angleId: string) => {
     const signal = startRequest()
@@ -346,7 +351,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                 : flow.step === 'researching'
                   ? 'Exploring public evidence for ' + activeCompany + '.'
                   : flow.step === 'investigating'
-                    ? 'Testing core research angle ' + (flow.angleIndex || 1) + ' of ' + (flow.angleTotal || Math.min(3, flow.research.angles.length)) + ' for ' + activeCompany + '. Additional angles can be investigated from the report when needed.'
+                    ? 'Cross-checking priority financial hypotheses for ' + activeCompany + '. SAKURA verifies quoted claims, publisher diversity and primary-source support before ranking up to five findings.'
                     : 'Examining evidence and challenging the hypothesis for ' + activeCompany + '.'}
             </p>
             <div className="mx-auto mt-8 h-px w-36 overflow-hidden bg-pink-100/10">
