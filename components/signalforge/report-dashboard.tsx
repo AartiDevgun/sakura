@@ -10,13 +10,15 @@ import { PeekRating } from './peek-rating'
 import { JellyRadio } from './jelly-radio'
 import { DiscoveryFlipCard } from './discovery-flip-card'
 import { ParagraphText } from './paragraph-text'
+import { PeerComparisonPanel } from './peer-comparison-panel'
 
-type SectionKey = 'overview' | 'discovery' | 'evidence' | 'numbers' | 'timeline' | 'challenge' | 'sources' | 'followup'
+type SectionKey = 'overview' | 'discovery' | 'evidence' | 'peers' | 'numbers' | 'timeline' | 'challenge' | 'sources' | 'followup'
 
 const SECTIONS: { id: SectionKey; label: string; icon: LucideIcon; note: string }[] = [
   { id: 'overview', label: 'Full report', icon: BookOpen, note: 'All required outputs' },
   { id: 'discovery', label: 'Discovery', icon: Sparkles, note: 'The signal' },
   { id: 'evidence', label: 'Evidence trail', icon: Network, note: 'What supports it' },
+  { id: 'peers', label: 'Peer context', icon: Network, note: 'Company vs peers' },
   { id: 'numbers', label: 'Numbers', icon: ChartNoAxesCombined, note: 'Calculated changes' },
   { id: 'timeline', label: 'Timeline', icon: CalendarDays, note: 'When it emerged' },
   { id: 'challenge', label: 'Challenge it', icon: FlaskConical, note: 'Alternatives & falsification' },
@@ -255,6 +257,10 @@ export function ReportDashboard({
               <CounterargumentExplorer items={report.counterarguments} sources={report.sources} />
             </div>
           </div>
+        ) : null}
+
+        {active === 'peers' ? (
+          <PeerComparisonPanel research={research} investigation={investigation} />
         ) : null}
 
         {active === 'followup' ? (
