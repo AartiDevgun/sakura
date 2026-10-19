@@ -1711,7 +1711,6 @@ const FINANCIAL_PEER_UNIVERSE: Record<string, FinancialPeerCandidate[]> = {
     { company: 'HDFC Bank', aliases: ['HDFC Bank Limited'], issuerDomains: ['hdfcbank.com'], relationship: 'direct_competitor' },
     { company: 'ICICI Bank', aliases: ['ICICI Bank Limited'], issuerDomains: ['icicibank.com'], relationship: 'direct_competitor' },
   ],
-  INDU SIND: [],
   SBIN: [
     { company: 'HDFC Bank', aliases: ['HDFC Bank Limited'], issuerDomains: ['hdfcbank.com'], relationship: 'direct_competitor' },
     { company: 'ICICI Bank', aliases: ['ICICI Bank Limited'], issuerDomains: ['icicibank.com'], relationship: 'direct_competitor' },
