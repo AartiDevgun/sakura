@@ -1619,13 +1619,19 @@ export async function livePeerComparison(
   })
 
   const supportedPeerCount = validatedPeers.filter(peer => peer.evidence.length > 0).length
+  const hasExplicitSectorEvidence = compareSources.some(item =>
+    ownerBySourceId.get(item.source.id) === 'peer-selection context' &&
+    /(industry[- ]wide|sector[- ]wide|industry trend|sector trend|industry outlook|sector outlook|across the sector|across the industry|sector-level|industry-level)/i.test(
+      item.source.title + ' ' + item.content.slice(0, 2500),
+    ),
+  )
   const statedOutcome = ['company_specific', 'peer_shared', 'industry_wide', 'inconclusive'].includes(String(result.outcome))
     ? result.outcome as PeerComparisonResponse['outcome']
     : 'inconclusive'
   let outcome: PeerComparisonResponse['outcome'] = statedOutcome
   if (supportedPeerCount === 0) outcome = 'inconclusive'
   else if (outcome === 'company_specific' && supportedPeerCount < 2) outcome = 'inconclusive'
-  else if (outcome === 'industry_wide' && supportedPeerCount < 3) outcome = 'peer_shared'
+  else if (outcome === 'industry_wide' && (supportedPeerCount < 3 || !hasExplicitSectorEvidence)) outcome = 'peer_shared'
 
   const responseSources = compareSources.map(item => item.source)
   const modelLimitations = Array.isArray(result.limitations)
@@ -1642,8 +1648,10 @@ export async function livePeerComparison(
     company: input.company.trim(),
     issue,
     outcome,
-    outcomeRationale: outcome === 'inconclusive' && statedOutcome !== 'inconclusive'
-      ? 'The proposed classification was more definite than the source-verified peer evidence allows. The comparison remains inconclusive.'
+    outcomeRationale: outcome !== statedOutcome
+      ? outcome === 'inconclusive'
+        ? 'The proposed classification was more definite than the source-verified peer evidence allows. The comparison remains inconclusive.'
+        : 'The evidence supports a peer-shared pattern, but SAKURA did not retain an industry-wide label because broader sector evidence or enough independently supported peer comparisons was missing.'
       : text(result.outcomeRationale, 'The available evidence does not establish a definitive peer comparison.'),
     comparisonBasis: text(result.comparisonBasis, 'Reporting periods and metric definitions must be aligned before making a like-for-like comparison.'),
     peers: validatedPeers,
