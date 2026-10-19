@@ -131,7 +131,7 @@ function targetedFinancialQuery(company: string, angle: string): string {
   const lower = angle.toLowerCase()
   let terms = metricTermsFor(company)
   if (/\bnim\b|net interest margin|interest margin|net interest income|\bnii\b/.test(lower)) {
-    terms = '"net interest margin" NIM "net interest income" NII'
+    terms = '"net interest margin" NIM "net interest income"'
   } else if (/npa|asset quality|credit cost|slippage|stage.?3|delinquen/.test(lower)) {
     terms = profile?.archetype === 'life_insurer' ? 'persistency surrender ratio claims ratio solvency ratio provisions' : 'GNPA NNPA "gross NPA" "net NPA" "stage 3" slippages provisions "credit cost"'
   } else if (/funding|deposit|liabilit|casa|cost of fund|capital adequacy|liquidity/.test(lower)) {
@@ -139,8 +139,8 @@ function targetedFinancialQuery(company: string, angle: string): string {
   } else if (/aum|loan.book|advance|disbursement|loan growth|yield/.test(lower)) {
     terms = profile?.archetype === 'life_insurer' ? 'APE "new business premium" VNB "VNB margin" persistency' : 'AUM "assets under management" advances disbursements yields book growth'
   }
-  const periods = 'FY 2020-21 FY 2021-22 FY 2022-23 FY 2023-24 FY 2024-25 FY 2025-26'
-  return (financialSearchIdentity(company) + ' ' + angle.slice(0,110) + ' ' + terms + ' ' + periods + ' annual report investor presentation quarterly results official filing').replace(/\s+/g,' ').slice(0,620)
+  const periods = 'FY21 FY22 FY23 FY24 FY25 FY26'
+  return (financialSearchIdentity(company) + ' ' + angle.slice(0,75) + ' ' + terms + ' ' + periods + ' annual report results').replace(/\s+/g,' ').slice(0,420)
 }
 
 const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b'
@@ -363,17 +363,27 @@ async function collectEvidence(
   angle?: string,
   signal?: AbortSignal,
 ): Promise<Evidence[]> {
-  // Use business-model-specific metrics with three baseline searches and one focused query per investigation.
+  // Three complementary searches: latest reporting, metric-focused issuer disclosures, and exchange filings.
+  // Concise queries help the search engine match the needed financial metric instead of an overly broad term list.
   const identity = financialSearchIdentity(company)
   const profile = financialProfile(company)
-  const metricTerms = metricTermsFor(company)
-  const periods = 'FY 2020-21 FY 2021-22 FY 2022-23 FY 2023-24 FY 2024-25 FY 2025-26'
+  const type = profile?.archetype ?? archetypeFor(company)
+  const issuerDomain = profile?.issuerDomains[0]
+  const coreMetrics = type === 'bank'
+    ? '"net interest margin" NIM advances deposits NPA'
+    : type === 'nbfc'
+      ? 'AUM disbursements "cost of funds" "stage 3"'
+      : type === 'life_insurer'
+        ? 'APE "new business premium" VNB persistency solvency'
+        : '"segment revenue" "segment profit" AUM subsidiaries'
   const queries = angle
     ? [targetedFinancialQuery(company, angle)]
     : [
-        identity + ' latest quarterly results FY 2026-27 FY 2025-26 official investor relations annual report financial statements',
-        identity + ' ' + metricTerms + ' ' + periods + ' annual report investor presentation historical financial trend',
-        identity + ' NSE BSE exchange filings financial results board outcome annual report investor presentation ' + (profile?.ticker ?? ''),
+        identity + ' latest quarterly results annual report investor presentation FY 2025-26',
+        issuerDomain
+          ? 'site:' + issuerDomain + ' ' + identity + ' ' + coreMetrics + ' annual report FY21 FY22 FY23 FY24 FY25 FY26'
+          : identity + ' ' + coreMetrics + ' annual report FY21 FY22 FY23 FY24 FY25 FY26',
+        identity + ' NSE BSE exchange filing quarterly financial results annual report ' + (profile?.ticker ?? ''),
       ]
 
   const candidates: SearchResult[] = []
@@ -446,7 +456,7 @@ async function collectEvidence(
         sourceType: classification.sourceType,
         sourceTier: classification.sourceTier,
       },
-      content: sourceText.slice(0, 12000),
+      content: sourceText.slice(0, 20000),
       score: typeof item.score === 'number' ? item.score : 0,
       host,
     }
@@ -733,7 +743,7 @@ async function askForJson(
   )
 }
 
-function sourceExcerpt(content: string, maxChars = 1800): string {
+function sourceExcerpt(content: string, maxChars = 2400): string {
   if (content.length <= maxChars) return content
 
   const units = content
@@ -752,31 +762,53 @@ function sourceExcerpt(content: string, maxChars = 1800): string {
     size += value.length + 5
   }
 
-  // Preserve opening context, then prioritise dated and numeric financial passages.
-  add(content.slice(0, 600))
+  // Prioritise actual metric rows before page introductions. A common failure mode
+  // is retaining numbers from a financial table but clipping the NIM/NII label.
+  const metricPatterns = [
+    /net interest margin|\bNIM\b/gi,
+    /net interest income|\bNII\b/gi,
+    /gross NPA|net NPA|\bGNPA\b|\bNNPA\b|stage[- ]?3/gi,
+    /assets under management|\bAUM\b|disbursements?/gi,
+    /annualized premium equivalent|\bAPE\b|value of new business|\bVNB\b/gi,
+    /persistency|solvency ratio|embedded value|cost of funds|cost of deposits|capital adequacy|CASA|segment revenue|segment profit/gi,
+  ]
+  for (const pattern of metricPatterns) {
+    let count = 0
+    for (const match of content.matchAll(pattern)) {
+      if (match.index === undefined) continue
+      const start = Math.max(0, match.index - 260)
+      const end = Math.min(content.length, match.index + match[0].length + 560)
+      add(content.slice(start, end))
+      count += 1
+      if (count >= 2 || size >= maxChars - 120) break
+    }
+    if (size >= maxChars - 120) break
+  }
+
+  // Retain some opening context and other dated/numeric financial facts.
+  add(content.slice(0, 320))
   for (const unit of units) {
+    if (size >= maxChars - 100) break
     if (
       /\d/.test(unit) &&
       /(₹|\binr\b|\brs\.?\b|crore|lakh|million|billion|revenue|profit|assets?|liabilit|deposit|advance|gross npa|net npa|\bgnpa\b|\bnnpa\b|\bnim\b|\bnii\b|\bape\b|\bvnb\b|persistency|solvency|embedded value|credit cost|margin|capital adequacy|cost of funds|disbursement|fy\s?\d|q[1-4]|20\d{2})/i.test(unit)
     ) add(unit)
   }
 
-  // Some provider extracts are long table-like lines without sentence punctuation.
-  // Keep short source-native windows around numeric facts in that case.
+  // Table-like extracts sometimes arrive as long lines; preserve compact number windows too.
   if (size < maxChars - 100) {
     for (const match of content.matchAll(/[^.!?\n]{0,180}\d[^.!?\n]{0,180}/g)) {
       add(match[0])
       if (size >= maxChars - 100) break
     }
   }
-
   for (const unit of units) {
     if (size >= maxChars - 100) break
     add(unit)
   }
-
   return chosen.join('\n[…]\n').slice(0, maxChars)
 }
+
 function evidenceForPrompt(sources: Evidence[]) {
   // Preserve original sourceIndex values while choosing source-diverse passages.
   const ranked = sources
