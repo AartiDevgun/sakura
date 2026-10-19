@@ -844,7 +844,23 @@ function containsNumber(sourceText: string, value: number): boolean {
 }
 
 function normalise(value: string): string {
-  return value.toLowerCase().replace(/\s+/g, ' ').trim()
+  return value
+    .normalize('NFKC')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[–—−]/g, '-')
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+    .trim()
+}
+
+/** Local context lets a table heading supply units/period labels for a quoted cell. */
+function sourceContextForQuote(sourceText: string, quote: string, radius = 180): string {
+  const corpus = normalise(sourceText)
+  const needle = normalise(quote)
+  const index = corpus.indexOf(needle)
+  if (index < 0) return quote
+  return corpus.slice(Math.max(0, index - radius), Math.min(corpus.length, index + needle.length + radius))
 }
 
 function quoteIsPresent(sourceText: string, quote: string): boolean {
@@ -947,20 +963,22 @@ function verifiedCalculations(value: unknown, sources: Evidence[]): Calculation[
       !unit ||
       !priorPeriod ||
       !currentPeriod ||
-      normalise(priorPeriod) === normalise(currentPeriod) ||
-      !periodIsSupported(priorPeriod, item.priorQuote) ||
-      !periodIsSupported(currentPeriod, item.currentQuote)
+      normalise(priorPeriod) === normalise(currentPeriod)
     ) continue
 
     const priorText = sources[priorIndex].content
     const currentText = sources[currentIndex].content
+    const priorContext = sourceContextForQuote(priorText, item.priorQuote)
+    const currentContext = sourceContextForQuote(currentText, item.currentQuote)
     if (
       !quoteIsPresent(priorText, item.priorQuote) ||
       !quoteIsPresent(currentText, item.currentQuote) ||
       !containsNumber(item.priorQuote, prior) ||
       !containsNumber(item.currentQuote, current) ||
-      !unitIsSupported(unit, item.priorQuote) ||
-      !unitIsSupported(unit, item.currentQuote)
+      !periodIsSupported(priorPeriod, priorContext) ||
+      !periodIsSupported(currentPeriod, currentContext) ||
+      !unitIsSupported(unit, priorContext) ||
+      !unitIsSupported(unit, currentContext)
     ) continue
 
     let formula = ''
