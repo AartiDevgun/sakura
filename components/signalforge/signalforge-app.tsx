@@ -100,16 +100,12 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
         return
       }
 
-      // Investigate all generated angles. The first three are mandatory and stay in
-      // their required order; then test every optional angle from strongest to weakest.
+      // Run only the three core Track A investigations automatically.
+      // Additional generated angles stay available through "Explore another angle",
+      // so a normal search doesn't spend model/search budget testing every candidate.
       const candidates: InvestigationResponse[] = []
       const errors: string[] = []
-      const angleRank = { strong: 3, moderate: 2, weak: 1 } as const
-      const mandatoryAngles = research.angles.slice(0, 3)
-      const optionalAngles = research.angles.slice(3).sort(
-        (a, b) => angleRank[b.signalStrength || 'moderate'] - angleRank[a.signalStrength || 'moderate'],
-      )
-      const anglesToTest = [...mandatoryAngles, ...optionalAngles]
+      const anglesToTest = research.angles.slice(0, 3)
       for (let index = 0; index < anglesToTest.length; index += 1) {
         const angle = anglesToTest[index]
         setFlow({ step: 'investigating', research, angleId: angle.id, angleIndex: index + 1, angleTotal: anglesToTest.length })
@@ -350,7 +346,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                 : flow.step === 'researching'
                   ? 'Exploring public evidence for ' + activeCompany + '.'
                   : flow.step === 'investigating'
-                    ? 'Testing discovery ' + (flow.angleIndex || 1) + ' of ' + (flow.angleTotal || flow.research.angles.length) + ' for ' + activeCompany + '. The mandatory checks run first, followed by additional angles ranked by preliminary signal.'
+                    ? 'Testing core research angle ' + (flow.angleIndex || 1) + ' of ' + (flow.angleTotal || Math.min(3, flow.research.angles.length)) + ' for ' + activeCompany + '. Additional angles can be investigated from the report when needed.'
                     : 'Examining evidence and challenging the hypothesis for ' + activeCompany + '.'}
             </p>
             <div className="mx-auto mt-8 h-px w-36 overflow-hidden bg-pink-100/10">
