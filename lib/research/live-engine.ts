@@ -98,10 +98,19 @@ function compactCompanyName(value: string): string {
 }
 function financialProfile(company: string): FinancialProfile | undefined {
   const input = compactCompanyName(company)
+  const exact = FINANCIAL_PROFILES.find(profile =>
+    [profile.displayName, profile.ticker, ...profile.aliases]
+      .some(alias => compactCompanyName(alias) === input),
+  )
+  if (exact) return exact
+
+  // Fuzzy matching is only for full company-name variants. Short tickers/aliases
+  // such as "SBI" must be matched exactly, otherwise they can collide with "SBI Life".
   return FINANCIAL_PROFILES.find(profile =>
-    [profile.displayName, profile.ticker, ...profile.aliases].some(alias => {
+    input.length >= 7 &&
+    [profile.displayName, ...profile.aliases].some(alias => {
       const candidate = compactCompanyName(alias)
-      return input === candidate || (input.length >= 7 && input.includes(candidate)) || (input.length >= 7 && candidate.length >= 7 && candidate.includes(input))
+      return candidate.length >= 7 && (input.includes(candidate) || candidate.includes(input))
     }),
   )
 }
