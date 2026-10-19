@@ -268,49 +268,163 @@ function classifySource(host: string, company = ''): SourceClassification {
   return { sourceType: 'other', sourceTier: 'unverified' }
 }
 
-async function searchWeb(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
+async function searchWithExa(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
   return cachedJson<SearchResult[]>(
-    'tavily-search',
+    'exa-search',
     query.trim().toLowerCase(),
     SEARCH_CACHE_TTL_SECONDS,
     async () => {
-      const dailyLimit = Number.parseInt(
-        process.env.SAKURA_TAVILY_DAILY_LIMIT ?? '25',
-        10,
-      )
-      if (!Number.isSafeInteger(dailyLimit) || dailyLimit < 1) {
-        throw new Error('Invalid SAKURA Tavily daily limit.')
+      const apiKey = process.env.EXA_API_KEY
+      if (!apiKey) {
+        throw new Error('EXA_API_KEY is not configured in the sakura_ui Vercel project. Add it to the environment used by this deployment.')
       }
 
-      // The shared Redis counter is checked before every fresh Tavily request.
-      await consumeDailyBudget('tavily', dailyLimit)
+      const dailyLimit = Number.parseInt(process.env.SAKURA_EXA_DAILY_LIMIT ?? '12', 10)
+      if (!Number.isSafeInteger(dailyLimit) || dailyLimit < 1) {
+        throw new Error('Invalid SAKURA_EXA_DAILY_LIMIT.')
+      }
 
-      const response = await fetch('https://api.tavily.com/search', {
+      // Exa has a separate shared Redis budget. Fail closed if Redis cannot enforce it.
+      try {
+        await consumeDailyBudget('exa', dailyLimit)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : ''
+        if (/Daily Tavily search allowance reached/i.test(message)) {
+          throw new Error('Daily Exa search allowance reached. It resets at 05:30 IST. Increase SAKURA_EXA_DAILY_LIMIT in Vercel Preview only if your Exa credits allow it.')
+        }
+        throw error
+      }
+
+      const response = await fetch('https://api.exa.ai/search', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'x-api-key': apiKey,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          api_key: requiredEnv('TAVILY_API_KEY'),
           query,
-          topic: 'general',
-          search_depth: 'basic',
-          max_results: 6,
-          include_raw_content: true,
-          include_answer: false,
+          type: 'auto',
+          numResults: 6,
+          contents: { text: true, highlights: true },
         }),
         signal,
         cache: 'no-store',
       })
 
       if (!response.ok) {
-        throw new Error(`Web search failed (${response.status}).`)
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('Exa authentication failed. Check EXA_API_KEY in the sakura_ui Vercel project.')
+        }
+        if (response.status === 402) {
+          throw new Error('Exa credits or usage access are unavailable. Check the Exa dashboard before retrying.')
+        }
+        if (response.status === 429) {
+          throw new Error('Exa rate or usage limit reached. Check the Exa dashboard before retrying.')
+        }
+        throw new Error('Exa web search failed (' + response.status + ').')
       }
 
-      const result = (await response.json()) as { results?: SearchResult[] }
-      return Array.isArray(result.results) ? result.results : []
+      const payload = (await response.json()) as {
+        results?: {
+          title?: string
+          url?: string
+          publishedDate?: string
+          text?: string
+          highlights?: unknown
+        }[]
+      }
+
+      return (Array.isArray(payload.results) ? payload.results : [])
+        .slice(0, 6)
+        .map((item): SearchResult => {
+          const highlights = Array.isArray(item.highlights)
+            ? item.highlights.filter((value): value is string => typeof value === 'string')
+            : []
+          const body = text(item.text, highlights.join('\n\n')).slice(0, 20000)
+          return {
+            title: text(item.title),
+            url: text(item.url),
+            content: body,
+            raw_content: body,
+            published_date: text(item.publishedDate) || undefined,
+            score: 0,
+          }
+        })
+        .filter(isUsableSearchResult)
     },
   )
 }
 
+async function searchWeb(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
+  let tavilyResults: SearchResult[] = []
+  let tavilyError: unknown
+
+  try {
+    tavilyResults = await cachedJson<SearchResult[]>(
+      'tavily-search',
+      query.trim().toLowerCase(),
+      SEARCH_CACHE_TTL_SECONDS,
+      async () => {
+        // Check configuration before consuming the daily provider allowance.
+        const apiKey = requiredEnv('TAVILY_API_KEY')
+        const dailyLimit = Number.parseInt(
+          process.env.SAKURA_TAVILY_DAILY_LIMIT ?? '25',
+          10,
+        )
+        if (!Number.isSafeInteger(dailyLimit) || dailyLimit < 1) {
+          throw new Error('Invalid SAKURA Tavily daily limit.')
+        }
+
+        // The shared Redis counter is checked before every fresh Tavily request.
+        await consumeDailyBudget('tavily', dailyLimit)
+
+        const response = await fetch('https://api.tavily.com/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_key: apiKey,
+            query,
+            topic: 'general',
+            search_depth: 'basic',
+            max_results: 6,
+            include_raw_content: true,
+            include_answer: false,
+          }),
+          signal,
+          cache: 'no-store',
+        })
+
+        if (!response.ok) {
+          throw new Error('Tavily web search failed (' + response.status + ').')
+        }
+
+        const result = (await response.json()) as { results?: SearchResult[] }
+        return Array.isArray(result.results) ? result.results : []
+      },
+    )
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error
+    tavilyError = error
+  }
+
+  const usableTavily = tavilyResults.filter(isUsableSearchResult)
+  // Avoid a second provider call when Tavily already supplied at least two usable pages.
+  if (usableTavily.length >= 2) return usableTavily
+
+  try {
+    const exaResults = await searchWithExa(query, signal)
+    const merged = [...usableTavily, ...exaResults].filter(isUsableSearchResult)
+    if (merged.length > 0) return merged
+    if (tavilyError instanceof Error) throw tavilyError
+    return []
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error
+    // Preserve partial Tavily results if Exa is temporarily unavailable; later evidence
+    // quality checks still decide whether those sources are enough to support a report.
+    if (usableTavily.length > 0) return usableTavily
+    throw error
+  }
+}
 async function cachedSearchOnly(query: string): Promise<SearchResult[]> {
   try {
     // This path can reuse existing public-search cache entries but never calls Tavily.
