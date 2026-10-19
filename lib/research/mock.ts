@@ -4,6 +4,8 @@ import type {
   FeedbackRequest,
   FeedbackResponse,
   InvestigationResponse,
+  PeerComparisonRequest,
+  PeerComparisonResponse,
   ResearchResponse,
 } from './schema'
 
@@ -133,4 +135,47 @@ export async function mockInvestigation(
 
 export async function mockFeedback(payload: FeedbackRequest): Promise<FeedbackResponse> {
   return { mode: 'mock', investigationId: payload.investigationId, persisted: false }
+}
+
+
+/** Clearly labelled placeholder data for the on-demand peer-comparison UI. */
+export async function mockPeerComparison(
+  payload: PeerComparisonRequest,
+  scenario: MockScenario,
+  signal?: AbortSignal,
+): Promise<PeerComparisonResponse> {
+  await wait(MOCK_LATENCY_MS, signal)
+  if (scenario === 'error') throw new MockScenarioError('[MOCK] Simulated peer-comparison failure.')
+
+  return {
+    mode: 'mock',
+    comparisonId: `mock-comparison-${crypto.randomUUID()}`,
+    company: payload.company,
+    issue: payload.discoveryHeadline,
+    outcome: 'inconclusive',
+    outcomeRationale: '[MOCK] No real peer research was performed. Connect the live research backend to assess whether this issue is company-specific or shared by comparable companies.',
+    comparisonBasis: '[MOCK] A real comparison should use peers with similar business models and align financial metrics, units, and reporting periods before drawing conclusions.',
+    peers: [
+      {
+        company: '[MOCK] Comparable company',
+        relationship: 'similar_business_model',
+        assessment: '[MOCK] Placeholder only. No claim is being made about a real company.',
+        comparisonPoint: '[MOCK] No real figures or equivalent reporting periods were collected.',
+        evidence: [],
+      },
+    ],
+    differences: [],
+    limitations: [
+      '[MOCK] This is demonstration data, not a real cross-company comparison.',
+      '[MOCK] No peer-specific sources were retrieved or verified.',
+    ],
+    sources: [
+      {
+        id: 'mock-peer-source',
+        title: '[MOCK] Peer-source placeholder — not evidence',
+        url: 'https://example.com/',
+        publisher: 'example.com',
+      },
+    ],
+  }
 }
