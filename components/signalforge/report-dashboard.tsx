@@ -83,11 +83,11 @@ export function ReportDashboard({
         </div>
       </div>
 
-      <div className={"rounded-2xl px-4 py-3 text-xs leading-6 " + (verifiedCount === 0 ? "border border-amber-200/20 bg-amber-950/20 text-amber-100/80" : "border border-pink-200/10 bg-black/35 text-rose-100/55")}>
-        {verifiedCount === 0
-          ? "No tested angle met the minimum verification gate. The report below is a diagnostic candidate, not a verified discovery. " + selectedAssessment.reason
-          : "Showing " + verifiedCount + (verifiedCount === 1 ? " verified discovery, ranked" : " verified discoveries, ranked") + " by attention priority and evidence strength. Each displayed finding has at least two quoted claims across distinct publishers and a primary source cited directly."}
-      </div>
+      {verifiedCount === 0 ? (
+        <div className="rounded-2xl border border-amber-200/20 bg-amber-950/20 px-4 py-3 text-xs leading-6 text-amber-100/80">
+          No tested angle met the minimum verification gate. The report below is a diagnostic candidate, not a verified discovery. {selectedAssessment.reason}
+        </div>
+      ) : null}
 
       <div className="rounded-2xl border border-pink-200/10 bg-black/35 px-4 py-3 sm:flex sm:items-center sm:gap-4">
         <p className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.17em] text-pink-300/60">Hypothesis tested</p>
@@ -99,7 +99,6 @@ export function ReportDashboard({
           angles={discoveryOptions}
           company={research.company}
           heading="Priority discoveries"
-          description={`These results passed source verification and are ranked by attention priority, then evidence strength. Select one to switch the full report instantly—no additional research call is needed.`}
           activeId={investigation.angleId}
           onSelect={onSelectDiscovery}
         />
