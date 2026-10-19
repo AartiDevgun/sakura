@@ -1,4 +1,4 @@
-import type { InvestigationResponse } from './schema'
+import type { InvestigationResponse, Source } from './schema'
 
 export type DiscoveryAssessment = {
   verified: boolean
@@ -26,7 +26,7 @@ export function assessDiscovery(item: InvestigationResponse): DiscoveryAssessmen
   })
   const citedSources = claims
     .map(claim => sourcesById.get(claim.sourceId))
-    .filter((source): source is NonNullable<typeof source> => Boolean(source))
+    .filter((source): source is Source => Boolean(source))
   const distinctDocuments = new Set(claims.map(claim => claim.sourceId)).size
   const publishers = new Set(citedSources.map(source => sourceHost(source.url, source.publisher || source.id)))
   const primaryCited = new Set(

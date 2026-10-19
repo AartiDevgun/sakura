@@ -86,7 +86,7 @@ export function ReportDashboard({
       <div className={"rounded-2xl px-4 py-3 text-xs leading-6 " + (verifiedCount === 0 ? "border border-amber-200/20 bg-amber-950/20 text-amber-100/80" : "border border-pink-200/10 bg-black/35 text-rose-100/55")}>
         {verifiedCount === 0
           ? "No tested angle met the minimum verification gate. The report below is a diagnostic candidate, not a verified discovery. " + selectedAssessment.reason
-          : "Showing " + verifiedCount + " verified discovery" + (verifiedCount === 1 ? "" : "ies") + ", ranked by attention priority and evidence strength. Each displayed discovery has at least two quoted claims across distinct publishers and a primary source cited directly."}
+          : "Showing " + verifiedCount + (verifiedCount === 1 ? " verified discovery, ranked" : " verified discoveries, ranked") + " by attention priority and evidence strength. Each displayed finding has at least two quoted claims across distinct publishers and a primary source cited directly."}
       </div>
 
       <div className="rounded-2xl border border-pink-200/10 bg-black/35 px-4 py-3 sm:flex sm:items-center sm:gap-4">
