@@ -17,10 +17,6 @@ export async function POST(request: Request) {
   if (!body.ok) return body.response
 
   try {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error('Missing environment variable: GEMINI_API_KEY')
-    }
-
     const question = body.data.question.trim()
     const normalizedQuestion = question.toLocaleLowerCase().replace(/\s+/g, ' ')
     const providerPreference = (process.env.SAKURA_RESEARCH_PROVIDER ?? 'auto').toLowerCase()
@@ -108,6 +104,10 @@ export async function POST(request: Request) {
       )
 
       return NextResponse.json({ answer })
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error('Missing environment variable: GEMINI_API_KEY')
     }
 
     const answer = await cachedJson<string>(
