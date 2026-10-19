@@ -101,7 +101,7 @@ function financialProfile(company: string): FinancialProfile | undefined {
   return FINANCIAL_PROFILES.find(profile =>
     [profile.displayName, profile.ticker, ...profile.aliases].some(alias => {
       const candidate = compactCompanyName(alias)
-      return input === candidate || (input.length >= 7 && input.includes(candidate)) || (candidate.length >= 7 && candidate.includes(input))
+      return input === candidate || (input.length >= 7 && input.includes(candidate)) || (input.length >= 7 && candidate.length >= 7 && candidate.includes(input))
     }),
   )
 }
