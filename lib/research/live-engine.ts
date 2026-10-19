@@ -452,7 +452,7 @@ async function searchWithGeminiGoogleGrounding(query: string, signal?: AbortSign
     if (!candidates.has(safeUrl.toString())) {
       candidates.set(safeUrl.toString(), { url: safeUrl.toString(), title })
     }
-    if (candidates.size >= 8) break
+    if (candidates.size >= 6) break
   }
 
   if (candidates.size === 0) {
@@ -474,7 +474,7 @@ async function searchWithGeminiGoogleGrounding(query: string, signal?: AbortSign
 async function searchWeb(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
   const identity = query.trim().toLowerCase()
   try {
-    return await cachedJson<SearchResult[]>(
+    const tavilyResults = await cachedJson<SearchResult[]>(
       'tavily-search',
       identity,
       SEARCH_CACHE_TTL_SECONDS,
@@ -508,6 +508,8 @@ async function searchWeb(query: string, signal?: AbortSignal): Promise<SearchRes
         return Array.isArray(result.results) ? result.results : []
       },
     )
+    if (tavilyResults.some(isUsableSearchResult)) return tavilyResults
+    throw new Error('Tavily returned no usable text-bearing search results.')
   } catch (tavilyError) {
     if (signal?.aborted) throw tavilyError
     if (process.env.SAKURA_GEMINI_SEARCH_FALLBACK?.toLowerCase() === 'false') {
