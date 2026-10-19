@@ -268,53 +268,277 @@ function classifySource(host: string, company = ''): SourceClassification {
   return { sourceType: 'other', sourceTier: 'unverified' }
 }
 
-async function searchWeb(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
-  return cachedJson<SearchResult[]>(
-    'tavily-search',
-    query.trim().toLowerCase(),
-    SEARCH_CACHE_TTL_SECONDS,
-    async () => {
-      const dailyLimit = Number.parseInt(
-        process.env.SAKURA_TAVILY_DAILY_LIMIT ?? '25',
-        10,
-      )
-      if (!Number.isSafeInteger(dailyLimit) || dailyLimit < 1) {
-        throw new Error('Invalid SAKURA Tavily daily limit.')
-      }
+const GEMINI_SEARCH_CACHE_TTL_SECONDS = 12 * 60 * 60
+const MAX_GROUNDED_PAGE_CHARS = 120_000
 
-      // The shared Redis counter is checked before every fresh Tavily request.
-      await consumeDailyBudget('tavily', dailyLimit)
+function decodeHtmlEntities(value: string): string {
+  const named: Record<string, string> = {
+    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+    rsquo: "'", lsquo: "'", rdquo: '"', ldquo: '"', ndash: '–',
+    mdash: '—', hellip: '…', pound: '£', euro: '€', rupee: '₹',
+    copy: '©', reg: '®', trade: '™',
+  }
+  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, entity: string) => {
+    if (entity[0] === '#') {
+      const hex = entity[1]?.toLowerCase() === 'x'
+      const codePoint = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
+      if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10ffff) return match
+      try { return String.fromCodePoint(codePoint) } catch { return match }
+    }
+    return named[entity.toLowerCase()] ?? match
+  })
+}
 
-      const response = await fetch('https://api.tavily.com/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_key: requiredEnv('TAVILY_API_KEY'),
-          query,
-          topic: 'general',
-          search_depth: 'basic',
-          max_results: 6,
-          include_raw_content: true,
-          include_answer: false,
-        }),
-        signal,
+function htmlToSourceText(html: string): string {
+  return decodeHtmlEntities(
+    html
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<(script|style|noscript|svg|iframe|form|nav|footer|header|head)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
+      .replace(/<(br|\/p|\/div|\/li|\/tr|\/h[1-6]|\/section|\/article|\/table)\b[^>]*>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/[\t\r ]+/g, ' ')
+      .replace(/\n\s+/g, '\n')
+      .replace(/\n{3,}/g, '\n\n'),
+  ).trim().slice(0, MAX_GROUNDED_PAGE_CHARS)
+}
+
+function safePublicHttpUrl(value: string): URL | null {
+  try {
+    const url = new URL(value)
+    if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.username || url.password) return null
+    const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '')
+    if (
+      host === 'localhost' ||
+      host.endsWith('.localhost') ||
+      host.endsWith('.local') ||
+      host.endsWith('.internal') ||
+      host === '::1' ||
+      host === '0.0.0.0' ||
+      /^127\./.test(host) ||
+      /^10\./.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^169\.254\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+    ) return null
+    return url
+  } catch {
+    return null
+  }
+}
+
+async function fetchGroundedPage(
+  urlValue: string,
+  fallbackTitle: string,
+  signal?: AbortSignal,
+): Promise<SearchResult | null> {
+  let currentUrl = safePublicHttpUrl(urlValue)
+  if (!currentUrl || /\.(?:pdf|docx?|xlsx?|pptx?)(?:$|[?#])/i.test(currentUrl.pathname + currentUrl.search)) {
+    return null
+  }
+
+  try {
+    let response: Response | undefined
+    for (let redirectCount = 0; redirectCount <= 3; redirectCount += 1) {
+      const fetchSignal = signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(8000)])
+        : AbortSignal.timeout(8000)
+      response = await fetch(currentUrl.toString(), {
+        method: 'GET',
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SAKURAResearch/1.0)', Accept: 'text/html,text/plain,application/xhtml+xml' },
+        redirect: 'manual',
         cache: 'no-store',
+        signal: fetchSignal,
       })
-
-      if (!response.ok) {
-        throw new Error(`Web search failed (${response.status}).`)
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location')
+        if (!location || redirectCount === 3) return null
+        const redirectedUrl = safePublicHttpUrl(new URL(location, currentUrl).toString())
+        if (!redirectedUrl) return null
+        currentUrl = redirectedUrl
+        continue
       }
+      break
+    }
 
-      const result = (await response.json()) as { results?: SearchResult[] }
-      return Array.isArray(result.results) ? result.results : []
+    if (!response?.ok) return null
+    const contentType = (response.headers.get('content-type') ?? '').toLowerCase()
+    if (
+      !contentType.includes('text/html') &&
+      !contentType.includes('text/plain') &&
+      !contentType.includes('application/xhtml+xml')
+    ) return null
+
+    const statedLength = Number(response.headers.get('content-length') ?? 0)
+    if (statedLength > 3_000_000) return null
+    const html = (await response.text()).slice(0, 3_000_000)
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+    const title = titleMatch
+      ? htmlToSourceText(titleMatch[1]).slice(0, 300) || fallbackTitle
+      : fallbackTitle
+    const sourceText = htmlToSourceText(html)
+    if (sourceText.length < 180) return null
+
+    return {
+      title,
+      url: currentUrl.toString(),
+      content: sourceText,
+      raw_content: sourceText,
+      score: 0.85,
+    }
+  } catch (error) {
+    if (signal?.aborted) throw error
+    return null
+  }
+}
+
+async function searchWithGeminiGoogleGrounding(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
+  const apiKey = requiredEnv('GEMINI_API_KEY')
+  const limit = Number.parseInt(process.env.SAKURA_GEMINI_DAILY_LIMIT ?? '60', 10)
+  if (!Number.isSafeInteger(limit) || limit < 1) {
+    throw new Error('Invalid SAKURA Gemini daily limit.')
+  }
+
+  // Shares the existing Gemini allowance with Gemini analysis and the Groq fallback.
+  // Search failover must not bypass the app's Gemini usage protection.
+  await consumeDailyBudget('gemini', limit)
+
+  const model = process.env.GEMINI_SEARCH_MODEL || 'gemini-3.8-flash'
+  const response = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent',
+    {
+      method: 'POST',
+      headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          role: 'user',
+          parts: [{
+            text: 'Use Google Search to find current web pages relevant to this research query: ' + query +
+              '. Prioritise official company filings, annual reports, exchange filings, regulators and credible financial reporting. ' +
+              'Search for relevant sources and return a brief source-led response. Do not invent URLs or facts.',
+          }],
+        }],
+        tools: [{ google_search: {} }],
+        generationConfig: { maxOutputTokens: 1024, thinkingConfig: { thinkingLevel: 'low' } },
+      }),
+      signal,
+      cache: 'no-store',
     },
   )
+
+  if (!response.ok) {
+    const errorPayload = await response.json().catch(() => null) as { error?: { message?: string } } | null
+    const detail = typeof errorPayload?.error?.message === 'string'
+      ? errorPayload.error.message.replace(/\s+/g, ' ').slice(0, 200)
+      : ''
+    throw new Error('Gemini Google Search grounding failed (' + response.status + ')' + (detail ? ': ' + detail : '.'))
+  }
+
+  const payload = await response.json() as {
+    candidates?: Array<{
+      groundingMetadata?: {
+        groundingChunks?: Array<{ web?: { uri?: string; title?: string } }>
+      }
+    }>
+  }
+  const chunks = payload.candidates?.[0]?.groundingMetadata?.groundingChunks ?? []
+  const candidates = new Map<string, { url: string; title: string }>()
+  for (const chunk of chunks) {
+    const uri = chunk.web?.uri
+    const title = text(chunk.web?.title)
+    if (!uri || !title) continue
+    const safeUrl = safePublicHttpUrl(uri)
+    if (!safeUrl) continue
+    safeUrl.hash = ''
+    if (!candidates.has(safeUrl.toString())) {
+      candidates.set(safeUrl.toString(), { url: safeUrl.toString(), title })
+    }
+    if (candidates.size >= 8) break
+  }
+
+  if (candidates.size === 0) {
+    throw new Error('Gemini Google Search grounding returned no traceable web sources.')
+  }
+
+  // Grounding metadata supplies citations/URLs, not source-document text. Fetch the public
+  // pages themselves; do not treat Gemini's paraphrase as verbatim source evidence.
+  const pages = await Promise.allSettled(
+    [...candidates.values()].map(item => fetchGroundedPage(item.url, item.title, signal)),
+  )
+  const results = pages.flatMap(page => page.status === 'fulfilled' && page.value ? [page.value] : [])
+  if (results.length === 0) {
+    throw new Error('Gemini found web links, but none exposed readable HTML/text for exact quote verification.')
+  }
+  return results
+}
+
+async function searchWeb(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
+  const identity = query.trim().toLowerCase()
+  try {
+    return await cachedJson<SearchResult[]>(
+      'tavily-search',
+      identity,
+      SEARCH_CACHE_TTL_SECONDS,
+      async () => {
+        const dailyLimit = Number.parseInt(process.env.SAKURA_TAVILY_DAILY_LIMIT ?? '25', 10)
+        if (!Number.isSafeInteger(dailyLimit) || dailyLimit < 1) {
+          throw new Error('Invalid SAKURA Tavily daily limit.')
+        }
+        await consumeDailyBudget('tavily', dailyLimit)
+
+        const response = await fetch('https://api.tavily.com/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_key: requiredEnv('TAVILY_API_KEY'),
+            query,
+            topic: 'general',
+            search_depth: 'basic',
+            max_results: 6,
+            include_raw_content: true,
+            include_answer: false,
+          }),
+          signal,
+          cache: 'no-store',
+        })
+
+        if (!response.ok) {
+          throw new Error('Tavily search failed (' + response.status + ').')
+        }
+        const result = await response.json() as { results?: SearchResult[] }
+        return Array.isArray(result.results) ? result.results : []
+      },
+    )
+  } catch (tavilyError) {
+    if (signal?.aborted) throw tavilyError
+    if (process.env.SAKURA_GEMINI_SEARCH_FALLBACK?.toLowerCase() === 'false') {
+      throw tavilyError
+    }
+
+    try {
+      return await cachedJson<SearchResult[]>(
+        'gemini-google-search',
+        identity,
+        GEMINI_SEARCH_CACHE_TTL_SECONDS,
+        () => searchWithGeminiGoogleGrounding(query, signal),
+      )
+    } catch (fallbackError) {
+      if (signal?.aborted) throw fallbackError
+      const primaryMessage = tavilyError instanceof Error ? tavilyError.message : 'Tavily search failed'
+      const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : 'Gemini Google Search grounding failed'
+      throw new Error('Tavily search failed, and Gemini search fallback could not complete. Tavily: ' +
+        primaryMessage + ' Gemini fallback: ' + fallbackMessage)
+    }
+  }
 }
 
 async function cachedSearchOnly(query: string): Promise<SearchResult[]> {
   try {
-    // This path can reuse existing public-search cache entries but never calls Tavily.
-    return (await getJson<SearchResult[]>('tavily-search', query.trim().toLowerCase())) ?? []
+    const identity = query.trim().toLowerCase()
+    const [tavily, gemini] = await Promise.all([
+      getJson<SearchResult[]>('tavily-search', identity).catch(() => null),
+      getJson<SearchResult[]>('gemini-google-search', identity).catch(() => null),
+    ])
+    return [...(tavily ?? []), ...(gemini ?? [])]
   } catch {
     return []
   }
