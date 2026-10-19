@@ -408,8 +408,9 @@ async function searchWeb(query: string, signal?: AbortSignal): Promise<SearchRes
   }
 
   const usableTavily = tavilyResults.filter(isUsableSearchResult)
-  // Avoid a second provider call when Tavily already supplied at least two usable pages.
-  if (usableTavily.length >= 2) return usableTavily
+  // Prefer any usable Tavily result. Exa is the reserve provider, not a second
+  // search for every query with only one good Tavily result; this preserves fallback credits.
+  if (usableTavily.length > 0) return usableTavily
 
   try {
     const exaResults = await searchWithExa(query, signal)
@@ -422,6 +423,12 @@ async function searchWeb(query: string, signal?: AbortSignal): Promise<SearchRes
     // Preserve partial Tavily results if Exa is temporarily unavailable; later evidence
     // quality checks still decide whether those sources are enough to support a report.
     if (usableTavily.length > 0) return usableTavily
+    // When both providers fail, expose both safe diagnostics instead of masking a Tavily
+    // authentication/quota issue behind the Exa fallback-cap message.
+    if (tavilyError instanceof Error) {
+      const fallbackMessage = error instanceof Error ? error.message : 'Exa web search failed.'
+      throw new Error(fallbackMessage + ' Tavily search also failed: ' + tavilyError.message)
+    }
     throw error
   }
 }
