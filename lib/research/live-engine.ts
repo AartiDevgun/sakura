@@ -788,18 +788,26 @@ async function askForJson(
     `${providerPreference || 'auto'}:${MODEL}:${geminiModel}\0${system}\0${prompt}`,
     ANALYSIS_CACHE_TTL_SECONDS,
     async () => {
+      const hasGroq = Boolean(process.env.GROQ_API_KEY)
       const hasGemini = Boolean(process.env.GEMINI_API_KEY)
-      // Groq stays primary whenever its API key is configured. The "gemini" preference
-      // enables Gemini as a fallback; it must not bypass Groq and make every run slower.
-      const useGeminiFirst = !process.env.GROQ_API_KEY
 
       if (providerPreference && providerPreference !== 'gemini' && providerPreference !== 'groq' && providerPreference !== 'auto') {
         throw new Error('Invalid SAKURA_RESEARCH_PROVIDER. Use auto, groq, or gemini.')
       }
 
+      // Explicit "groq" mode must never silently switch to Gemini, even when the
+      // Groq key is missing. This keeps provider selection predictable and debuggable.
+      if (providerPreference === 'groq' && !hasGroq) {
+        throw new Error('SAKURA is set to Groq-only mode, but GROQ_API_KEY is not configured for this Vercel Preview. Add the Groq key and redeploy.')
+      }
+
+      // Groq is primary when configured. Auto mode can use Gemini when Groq is
+      // unavailable; explicit groq mode never calls Gemini.
+      const useGeminiFirst = providerPreference !== 'groq' && !hasGroq
+
       if (useGeminiFirst) {
         if (!hasGemini) {
-          throw new Error('Gemini research is selected but GEMINI_API_KEY is not configured in Vercel Preview.')
+          throw new Error('No AI provider is configured for this Vercel Preview. Set GROQ_API_KEY, or select Gemini mode and configure GEMINI_API_KEY.')
         }
         return askGeminiForJson(system, prompt, signal)
       }
