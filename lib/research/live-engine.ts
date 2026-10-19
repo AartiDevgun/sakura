@@ -1023,19 +1023,30 @@ function verifiedEvidenceClaims(value: unknown, sources: Evidence[]): EvidenceCl
   }
 
   // Prefer direct disclosures and independent source documents over repeated rating commentary.
+  // A single filing may contain several genuinely distinct facts (for example, a five-year NIM
+  // series plus deposit growth). Keep up to three different quotations per document instead of
+  // throwing away every second fact solely because it comes from the same official report.
   candidates.sort((a, b) => sourceQualityScore(b.source) - sourceQualityScore(a.source))
   const selected: EvidenceClaim[] = []
-  const usedSourceIds = new Set<string>()
+  const sourceClaimCounts = new Map<string, number>()
+  const seenQuotes = new Set<string>()
+  const seenClaims = new Set<string>()
   let ratingSourceCount = 0
 
   for (const candidate of candidates) {
     const { source } = candidate
-    if (usedSourceIds.has(candidate.claim.sourceId)) continue
+    const sourceId = candidate.claim.sourceId
+    const normalQuote = normalise(candidate.claim.quote)
+    const normalClaim = normalise(candidate.claim.claim)
+    if (seenQuotes.has(normalQuote) || seenClaims.has(normalClaim)) continue
+    if ((sourceClaimCounts.get(sourceId) ?? 0) >= 3) continue
     const rating = isRatingRationale(source)
     if (rating && ratingSourceCount >= 1) continue
 
     selected.push(candidate.claim)
-    usedSourceIds.add(candidate.claim.sourceId)
+    seenQuotes.add(normalQuote)
+    seenClaims.add(normalClaim)
+    sourceClaimCounts.set(sourceId, (sourceClaimCounts.get(sourceId) ?? 0) + 1)
     if (rating) ratingSourceCount += 1
     if (selected.length >= 8) break
   }

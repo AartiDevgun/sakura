@@ -47,14 +47,10 @@ export function assessDiscovery(item: InvestigationResponse): DiscoveryAssessmen
   const primaryCited = new Set(
     citedSources.filter(source => source.sourceTier === 'primary').map(source => source.id),
   )
-  const findingText = [
-    item.discovery.headline,
-    item.discovery.summary,
-    item.report.thesis,
-    ...claims.map(claim => claim.claim),
-  ].join(' ')
+  // Check the actual finding headline, not every limitation sentence in the report.
+  // A supported FY21-FY25 trend should not be downgraded just because FY26 remains unknown.
   const explicitlyInsufficient =
-    /insufficient evidence|evidence is insufficient|not enough evidence|unable to assess|cannot establish|could not establish|no sufficiently supported discovery|no clear conclusion|data gap prevents|not possible to determine/i.test(findingText)
+    /^(?:insufficient evidence|not enough evidence|unable to assess|cannot establish|could not establish|no sufficiently supported discovery|no clear conclusion|data gap prevents|not possible to determine)\b/i.test(item.discovery.headline.trim())
 
   const verified =
     !explicitlyInsufficient &&
@@ -66,12 +62,14 @@ export function assessDiscovery(item: InvestigationResponse): DiscoveryAssessmen
   const reason = verified
     ? 'Passed quote, source-diversity and primary-disclosure checks.'
     : explicitlyInsufficient
-      ? 'The report itself says the available evidence is insufficient.'
-      : claims.length < 2 || distinctDocuments < 2
-        ? 'Fewer than two independently traceable quoted claims support this finding.'
-        : publishers.size < 2
-          ? 'The supporting claims do not span at least two distinct publishers.'
-          : 'No primary disclosure is linked directly to a verified claim.'
+      ? 'The finding headline states that evidence is insufficient.'
+      : claims.length < 2
+        ? 'Only ' + claims.length + ' quoted claim' + (claims.length === 1 ? ' passed' : 's passed') + ' exact-text verification; at least two are required.'
+        : distinctDocuments < 2
+          ? 'The verified claims trace to only one distinct source document; a second document is required.'
+          : publishers.size < 2
+            ? 'The verified claims do not span two distinct publisher domains.'
+            : 'No primary disclosure is directly linked to a verified claim.'
 
   // Rank actionable adverse signals ahead of routine/positive observations, while
   // using source breadth, confidence and checked calculations to break close ties.
