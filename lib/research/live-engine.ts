@@ -1421,9 +1421,10 @@ export async function livePeerComparison(
     .slice(0, 3)
     .map(entry => entry.item)
 
+  // Keep this optional feature budget-friendly: one discovery search and at most
+  // two peer-specific searches. searchWeb reuses cached results and guards every fresh call.
   const candidateQueries = [
-    '"' + input.company + '" comparable companies competitors same business model ' + selectedAngle.title + ' India',
-    '"' + input.company + '" peer group sector competitors banks NBFC financial services annual results',
+    '"' + input.company + '" ' + selectedAngle.title + ' comparable banks NBFC peers same financial metric reporting period India sector trend',
   ]
   const candidateBatches = await Promise.allSettled(candidateQueries.map(query => searchWeb(query, signal)))
   if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
@@ -1457,12 +1458,12 @@ export async function livePeerComparison(
       'Research angle: ' + selectedAngle.title,
       'Issue being tested (a lead from the current report, not a verified fact by itself): ' + input.discoveryHeadline,
       'Context summary (use for search context, not as evidence): ' + input.discoverySummary,
-      'Select up to three comparable companies. Prefer similar business models and risk drivers; compare lenders with lenders, insurers with insurers, and other financial-services firms only with genuinely comparable firms.',
+      'Select up to two comparable companies. Prefer similar business models and risk drivers; compare lenders with lenders, insurers with insurers, and other financial-services firms only with genuinely comparable firms.',
       'Only choose names explicitly mentioned in the supplied source excerpts, and cite the sourceIndex where each name is explicitly mentioned. Do not invent company names or assume peers share the issue.',
       'Candidate discovery sources:',
       JSON.stringify(candidateContext),
       'Return JSON only in this shape: {"peers":[{"company":"Exact company name as shown in source","relationship":"direct_competitor | similar_business_model | adjacent_peer","reason":"Why its business model is relevant","sourceIndex":0}]}',
-      'Choose two or three where evidence allows. Return fewer if there are not enough credible candidates.',
+      'Choose up to two where evidence allows. Return fewer if there are not enough credible candidates.',
     ].join('\n\n'),
     signal,
   )
@@ -1489,7 +1490,7 @@ export async function livePeerComparison(
       reason: text(item.reason, 'The retrieved source suggests a potentially comparable business model.'),
       sourceIndex,
     })
-    if (peers.length >= 3) break
+    if (peers.length >= 2) break
   }
 
   if (peers.length === 0) {
@@ -1573,13 +1574,13 @@ export async function livePeerComparison(
       'The source field companyAssociation identifies which company a source is about. "peer-selection context" supports only why a peer was considered; it is not evidence that the issue occurs at that peer.',
       'Use ONLY supplied source excerpts. Never infer peer performance from anchor-company evidence. For each peer, link evidence to that peer own source passages. Compare like with like: same metric where possible, equivalent units and aligned reporting periods.',
       'If metrics or periods cannot be aligned, say so explicitly. Do not claim the issue is absent or more severe merely because data is missing.',
-      'Classify conservatively: company_specific requires at least two adequately reviewed peers and evidence that the issue is materially absent or meaningfully different; peer_shared requires at least one peer source supporting the same issue; industry_wide requires several peers plus reliable source evidence explicitly describing a broader sector trend; otherwise use inconclusive.',
+      'Classify conservatively: company_specific requires both peers to have relevant source-verified evidence and the issue to be materially absent or meaningfully different; peer_shared requires at least one peer source supporting the same issue; industry_wide requires evidence from both peer companies plus a reliable retrieved source explicitly describing a broader sector trend; otherwise use inconclusive.',
       'Do not overstate causality. Explain how the subject company differs only when sources justify it.',
       'Retrieved sources:',
       JSON.stringify(evidencePayload),
       'Return JSON with this shape:',
       '{"outcome":"company_specific | peer_shared | industry_wide | inconclusive","outcomeRationale":"Evidence-led explanation and limits","comparisonBasis":"Metrics and periods compared or why they are not comparable","peers":[{"company":"Exact selected peer name","relationship":"direct_competitor | similar_business_model | adjacent_peer","assessment":"Peer-specific source-backed assessment","comparisonPoint":"Like-for-like comparison, or why it could not be made","evidence":[{"claim":"Peer-specific observation","quote":"Exact source quotation","sourceIndex":0,"date":"Source period or empty string"}]}],"differences":["Source-backed differences"],"limitations":["Specific gaps"]}',
-      'Return at most three peer rows. Each evidence quote must be verbatim, at least 15 characters, and use a valid sourceIndex. Peer evidence MUST cite a source whose companyAssociation is that exact peer—not the anchor or peer-selection context. Never invent values, dates, URLs or causal explanations. Prefer "inconclusive" over a confident guess.',
+      'Return at most two peer rows. Each evidence quote must be verbatim, at least 15 characters, and use a valid sourceIndex. Peer evidence MUST cite a source whose companyAssociation is that exact peer—not the anchor or peer-selection context. Never invent values, dates, URLs or causal explanations. Prefer "inconclusive" over a confident guess.',
     ].join('\n\n'),
     signal,
   )
@@ -1634,7 +1635,7 @@ export async function livePeerComparison(
   let outcome: PeerComparisonResponse['outcome'] = statedOutcome
   if (supportedPeerCount === 0) outcome = 'inconclusive'
   else if (outcome === 'company_specific' && supportedPeerCount < 2) outcome = 'inconclusive'
-  else if (outcome === 'industry_wide' && (supportedPeerCount < 3 || !hasExplicitSectorEvidence)) outcome = 'peer_shared'
+  else if (outcome === 'industry_wide' && (supportedPeerCount < 2 || !hasExplicitSectorEvidence)) outcome = 'peer_shared'
 
   const responseSources = compareSources.map(item => item.source)
   const modelLimitations = Array.isArray(result.limitations)
