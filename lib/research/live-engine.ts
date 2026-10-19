@@ -833,6 +833,9 @@ async function askForJson(
               { role: 'user', content: prompt },
             ],
             response_format: { type: 'json_object' },
+            // GPT-OSS requires an explicit reasoning format when JSON mode is enabled.
+            // "hidden" keeps internal reasoning out of the user-facing output.
+            reasoning_format: 'hidden',
             max_completion_tokens: 2000,
           }),
           signal,
@@ -840,6 +843,21 @@ async function askForJson(
         })
 
         if (!response.ok) {
+          const errorPayload = await response.json().catch(() => null) as {
+            error?: { message?: string; code?: string | number; type?: string }
+          } | null
+          const providerMessage = typeof errorPayload?.error?.message === 'string'
+            ? errorPayload.error.message.replace(/\\s+/g, ' ').slice(0, 300)
+            : ''
+          // Log only status, model and a short provider diagnostic. Never log prompts or secrets.
+          console.error('[SAKURA Groq research] Provider request failed', {
+            httpStatus: response.status,
+            providerCode: errorPayload?.error?.code,
+            providerType: errorPayload?.error?.type,
+            model: MODEL,
+            message: providerMessage || undefined,
+          })
+
           if (response.status === 413) {
             throw new Error('Groq request payload was too large (413). SAKURA has reduced its source excerpts; try again, or use a shorter research angle.')
           }
@@ -852,7 +870,7 @@ async function askForJson(
           if (response.status === 429) {
             throw new Error('Groq rate or usage limit reached. Check the Groq Console usage page before retrying.')
           }
-          throw new Error(`Groq analysis request failed (${response.status}). Check the Groq Console and SAKURA environment settings.`)
+          throw new Error(`Groq analysis request failed (${response.status})${providerMessage ? `: ${providerMessage}` : '. Check the Groq Console and SAKURA environment settings.'}`)
         }
 
         const payload = (await response.json()) as {
