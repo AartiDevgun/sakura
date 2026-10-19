@@ -10,12 +10,27 @@ export type DiscoveryAssessment = {
   evidenceScore: number
 }
 
+const MULTI_LEVEL_PUBLIC_SUFFIXES = new Set([
+  'co.in', 'com.in', 'org.in', 'gov.in', 'net.in', 'ac.in',
+  'co.uk', 'com.uk', 'org.uk', 'gov.uk', 'ac.uk',
+  'com.au', 'net.au', 'org.au', 'gov.au',
+  'co.nz', 'com.sg', 'com.hk', 'com.bd',
+])
+
 function sourceHost(url: string, fallback: string): string {
+  let hostname: string
   try {
-    return new URL(url).hostname.replace(/^www\./, '').toLowerCase()
+    hostname = new URL(url).hostname.replace(/^www\./, '').toLowerCase()
   } catch {
-    return fallback.toLowerCase()
+    hostname = fallback.toLowerCase().replace(/^www\./, '')
   }
+  const labels = hostname.split('.').filter(Boolean)
+  if (labels.length < 2) return hostname
+  const suffix = labels.slice(-2).join('.')
+  // Group investor/company subdomains under the same registrable domain. For common
+  // multi-level public suffixes such as co.in, retain the company label as well.
+  const domainLabels = MULTI_LEVEL_PUBLIC_SUFFIXES.has(suffix) ? 3 : 2
+  return labels.slice(-Math.min(domainLabels, labels.length)).join('.')
 }
 
 export function assessDiscovery(item: InvestigationResponse): DiscoveryAssessment {
