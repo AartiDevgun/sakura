@@ -119,11 +119,12 @@ function metricTermsFor(company: string): string {
 function profileDescription(company: string): string {
   const profile = financialProfile(company)
   const type = profile?.archetype ?? archetypeFor(company)
-  return \`\${profile ? \`\${profile.displayName} (\${profile.ticker})\` : company}, business type: \${type.replace(/_/g,' ')}. Prioritise \${FINANCIAL_FOCUS[type]}. Do not assume every metric applies.\`
+  const name = profile ? profile.displayName + ' (' + profile.ticker + ')' : company
+  return name + ', business type: ' + type.replace(/_/g, ' ') + '. Prioritise ' + FINANCIAL_FOCUS[type] + '. Do not assume every metric applies.'
 }
 function financialSearchIdentity(company: string): string {
   const profile = financialProfile(company)
-  return profile ? \`"\${profile.displayName}" \${profile.ticker}\` : \`"\${company.trim()}"\`
+  return profile ? '"' + profile.displayName + '" ' + profile.ticker : '"' + company.trim() + '"'
 }
 function targetedFinancialQuery(company: string, angle: string): string {
   const profile = financialProfile(company)
@@ -139,7 +140,7 @@ function targetedFinancialQuery(company: string, angle: string): string {
     terms = profile?.archetype === 'life_insurer' ? 'APE "new business premium" VNB "VNB margin" persistency' : 'AUM "assets under management" advances disbursements yields book growth'
   }
   const periods = 'FY 2020-21 FY 2021-22 FY 2022-23 FY 2023-24 FY 2024-25 FY 2025-26'
-  return \`\${financialSearchIdentity(company)} \${angle.slice(0,110)} \${terms} \${periods} annual report investor presentation quarterly results official filing\`.replace(/\s+/g,' ').slice(0,620)
+  return (financialSearchIdentity(company) + ' ' + angle.slice(0,110) + ' ' + terms + ' ' + periods + ' annual report investor presentation quarterly results official filing').replace(/\s+/g,' ').slice(0,620)
 }
 
 const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b'
@@ -362,8 +363,7 @@ async function collectEvidence(
   angle?: string,
   signal?: AbortSignal,
 ): Promise<Evidence[]> {
-  // Use metric vocabulary that matches the company's financial business model.
-  // Keep three baseline searches and one focused query per investigation; run searches concurrently.
+  // Use business-model-specific metrics with three baseline searches and one focused query per investigation.
   const identity = financialSearchIdentity(company)
   const profile = financialProfile(company)
   const metricTerms = metricTermsFor(company)
@@ -371,9 +371,9 @@ async function collectEvidence(
   const queries = angle
     ? [targetedFinancialQuery(company, angle)]
     : [
-        \`\${identity} latest quarterly results FY 2026-27 FY 2025-26 official investor relations annual report financial statements\`,
-        \`\${identity} \${metricTerms} \${periods} annual report investor presentation historical financial trend\`,
-        \`\${identity} NSE BSE exchange filings financial results board outcome annual report investor presentation \${profile?.ticker ?? ''}\`,
+        identity + ' latest quarterly results FY 2026-27 FY 2025-26 official investor relations annual report financial statements',
+        identity + ' ' + metricTerms + ' ' + periods + ' annual report investor presentation historical financial trend',
+        identity + ' NSE BSE exchange filings financial results board outcome annual report investor presentation ' + (profile?.ticker ?? ''),
       ]
 
   const candidates: SearchResult[] = []
