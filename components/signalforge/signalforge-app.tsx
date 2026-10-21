@@ -80,69 +80,17 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
     const signal = startRequest()
     setFlow({ step: 'researching', company })
     try {
-      const research = await postJson('/api/research', { company }, researchResponseSchema, { signal, mockScenario })
-      if (research.angles.length === 0) {
-        setFlow({ step: 'angles', research })
-        return
-      }
-
-      // Inspect five priority hypotheses by default: the three required Track A
-      // angles plus the two strongest company-specific candidates. Search/AI calls
-      // run in two small parallel batches to reduce elapsed time without launching
-      // every optional angle and consuming the whole daily allowance.
-      const priorityAngles = research.angles.slice(0, 5)
-      const candidates: InvestigationResponse[] = []
-      const errors: string[] = []
-
-      const investigateBatch = async (angles: ResearchAngle[], offset: number) => {
-        if (angles.length === 0 || signal.aborted) return
-        setFlow({
-          step: 'investigating',
-          research,
-          angleId: angles[0].id,
-          angleIndex: offset + 1,
-          angleTotal: priorityAngles.length,
-        })
-        const settled = await Promise.allSettled(
-          angles.map(angle =>
-            postJson(
-              '/api/research/investigate',
-              { researchId: research.researchId, company: research.company, angleId: angle.id },
-              investigationResponseSchema,
-              { signal, mockScenario },
-            ),
-          ),
-        )
-        for (const result of settled) {
-          if (result.status === 'fulfilled') {
-            candidates.push(result.value)
-          } else if (!isAbortError(result.reason)) {
-            errors.push(result.reason instanceof Error ? result.reason.message : 'An investigation failed.')
-          }
-        }
-      }
-
-      await investigateBatch(priorityAngles.slice(0, 3), 0)
-      await investigateBatch(priorityAngles.slice(3, 5), 3)
+      // Search builds the evidence-backed investigation plan first. The user chooses
+      // which hypothesis to investigate, rather than auto-launching five Groq calls
+      // every time a company is searched.
+      const research = await postJson(
+        '/api/research',
+        { company },
+        researchResponseSchema,
+        { signal, mockScenario },
+      )
       if (signal.aborted) return
-
-      if (candidates.length === 0) {
-        const firstAngle = priorityAngles[0] || research.angles[0]
-        setFlow({
-          step: 'investigation-error',
-          research,
-          angleId: firstAngle.id,
-          message: errors[0] || 'No candidate angle could be investigated.',
-        })
-        return
-      }
-
-      const ranked = rankDiscoveries(candidates)
-      const verified = ranked.filter(isVerifiedDiscovery).slice(0, 5)
-      // If none passes, show one diagnostic report with an explicit warning instead
-      // of presenting an unsupported hypothesis as a verified discovery.
-      const displayed = verified.length > 0 ? verified : ranked.slice(0, 1)
-      setFlow({ step: 'result', research, investigation: displayed[0], discoveries: displayed })
+      setFlow({ step: 'angles', research })
     } catch (error) {
       if (isAbortError(error)) return
       setFlow({ step: 'research-error', company, message: (error as Error).message })
@@ -351,7 +299,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                 : flow.step === 'researching'
                   ? 'Exploring public evidence for ' + activeCompany + '.'
                   : flow.step === 'investigating'
-                    ? 'Cross-checking priority financial hypotheses for ' + activeCompany + '. SAKURA verifies quoted claims, publisher diversity and primary-source support before ranking up to five findings.'
+                    ? 'Cross-checking your selected hypothesis for ' + activeCompany + '. SAKURA verifies quoted claims, publisher diversity and primary-source support before presenting a finding.'
                     : 'Examining evidence and challenging the hypothesis for ' + activeCompany + '.'}
             </p>
             <div className="mx-auto mt-8 h-px w-36 overflow-hidden bg-pink-100/10">
