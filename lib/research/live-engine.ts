@@ -1228,7 +1228,7 @@ sourceIndexes must refer only to supplied sourceIndex numbers. The angles are hy
     const batchResults: JsonObject[] = []
     const requestBatch = async (rows: typeof evidenceRows): Promise<void> => {
       try {
-        batchResults.push(await askForJson(RESEARCH_SYSTEM, buildAnglePrompt(rows), signal, false, ANGLE_RESPONSE_FORMAT)
+        batchResults.push(await askForJson(RESEARCH_SYSTEM, buildAnglePrompt(rows), signal, false, ANGLE_RESPONSE_FORMAT))
       } catch (batchError) {
         const batchMessage = batchError instanceof Error ? batchError.message : String(batchError)
         if (!/Groq request payload was too large \(413\)/i.test(batchMessage) || rows.length <= 1) {
