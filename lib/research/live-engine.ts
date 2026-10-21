@@ -271,7 +271,7 @@ function classifySource(host: string, company = ''): SourceClassification {
 async function searchWithExa(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
   return cachedJson<SearchResult[]>(
     'exa-search',
-    query.trim().toLowerCase(),
+    normalisedSearchQuery(query),
     SEARCH_CACHE_TTL_SECONDS,
     async () => {
       const apiKey = process.env.EXA_API_KEY
@@ -358,7 +358,7 @@ async function searchWithExa(query: string, signal?: AbortSignal): Promise<Searc
 async function searchWithTavily(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
   return cachedJson<SearchResult[]>(
     'tavily-search',
-    query.trim().toLowerCase(),
+    normalisedSearchQuery(query),
     SEARCH_CACHE_TTL_SECONDS,
     async () => {
       // Check configuration before consuming the daily provider allowance.
@@ -453,44 +453,56 @@ function mergeSearchResults(tavilyResults: SearchResult[], exaResults: SearchRes
 }
 
 async function searchWeb(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
-  // Run both independent search providers for each fresh query. Groq is used later
-  // for analysis; it does not search the web. Provider budgets/caches are enforced
-  // separately, and a healthy provider's results remain usable if the other fails.
-  const [tavilyOutcome, exaOutcome] = await Promise.allSettled([
-    searchWithTavily(query, signal),
-    searchWithExa(query, signal),
-  ])
+  // Tavily is primary. Only call Exa when Tavily fails or returns no usable sources.
+  // This preserves the evidence pipeline while avoiding duplicate paid searches.
+  let tavilyResults: SearchResult[] = []
+  let tavilyError: unknown
+
+  try {
+    tavilyResults = await searchWithTavily(query, signal)
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error
+    tavilyError = error
+  }
 
   if (signal?.aborted) throw new DOMException('Request cancelled.', 'AbortError')
 
-  const tavilyResults = tavilyOutcome.status === 'fulfilled' ? tavilyOutcome.value : []
-  const exaResults = exaOutcome.status === 'fulfilled' ? exaOutcome.value : []
-  const usable = mergeSearchResults(tavilyResults, exaResults)
+  const usableTavily = mergeSearchResults(tavilyResults, [])
+  if (usableTavily.length > 0) return usableTavily
 
-  if (usable.length > 0) {
-    if (tavilyOutcome.status === 'rejected') {
-      console.warn('[SAKURA] Tavily search unavailable; using Exa results for this query.')
+  let exaResults: SearchResult[]
+  try {
+    exaResults = await searchWithExa(query, signal)
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error
+    if (tavilyError instanceof Error) {
+      const exaMessage = error instanceof Error ? error.message : 'Exa search failed.'
+      throw new Error(exaMessage + ' Tavily search also failed: ' + tavilyError.message)
     }
-    if (exaOutcome.status === 'rejected') {
-      console.warn('[SAKURA] Exa search unavailable; using Tavily results for this query.')
-    }
-    return usable
+    throw error
   }
 
-  const tavilyError = tavilyOutcome.status === 'rejected' ? tavilyOutcome.reason : null
-  const exaError = exaOutcome.status === 'rejected' ? exaOutcome.reason : null
-  const messageOf = (error: unknown) => error instanceof Error ? error.message : 'Search provider failed.'
-  if (tavilyError && exaError) {
-    throw new Error(messageOf(tavilyError) + ' Exa search also failed: ' + messageOf(exaError))
+  if (signal?.aborted) throw new DOMException('Request cancelled.', 'AbortError')
+
+  const usableExa = mergeSearchResults([], exaResults)
+  if (usableExa.length > 0) {
+    if (tavilyError) {
+      console.warn('[SAKURA] Tavily search unavailable; Exa fallback returned usable sources.')
+    }
+    return usableExa
   }
-  if (tavilyError) throw tavilyError
-  if (exaError) throw exaError
+
+  if (tavilyError instanceof Error) throw tavilyError
   return []
+}
+
+function normalisedSearchQuery(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 async function cachedSearchOnly(query: string): Promise<SearchResult[]> {
   try {
     // This path can reuse existing public-search cache entries but never calls Tavily.
-    return (await getJson<SearchResult[]>('tavily-search', query.trim().toLowerCase())) ?? []
+    return (await getJson<SearchResult[]>('tavily-search', normalisedSearchQuery(query))) ?? []
   } catch {
     return []
   }
