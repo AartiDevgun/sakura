@@ -4,6 +4,9 @@ import { createHash } from 'node:crypto'
 
 const PREFIX = 'sakura:v1'
 
+// Coalesce identical concurrent cache misses within one serverless instance.
+const inFlight = new Map<string, Promise<unknown>>()
+
 function credentials() {
   const url = process.env.UPSTASH_REDIS_REST_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN
@@ -141,21 +144,33 @@ export async function cachedJson<T>(
     // Search caching is best-effort. Provider budget checks remain separate.
   }
 
-  const result = await producer()
+  const existing = inFlight.get(key)
+  if (existing) return existing as Promise<T>
 
+  const work = (async () => {
+    const result = await producer()
+
+    try {
+      await redisCommand([
+        'SET',
+        key,
+        JSON.stringify(result),
+        'EX',
+        Math.max(60, Math.floor(ttlSeconds)),
+      ])
+    } catch {
+      console.warn('[SAKURA] Cache write failed.')
+    }
+
+    return result
+  })()
+
+  inFlight.set(key, work)
   try {
-    await redisCommand([
-      'SET',
-      key,
-      JSON.stringify(result),
-      'EX',
-      Math.max(60, Math.floor(ttlSeconds)),
-    ])
-  } catch {
-    console.warn('[SAKURA] Cache write failed.')
+    return await work
+  } finally {
+    if (inFlight.get(key) === work) inFlight.delete(key)
   }
-
-  return result
 }
 
 /**
