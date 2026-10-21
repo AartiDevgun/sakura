@@ -410,15 +410,15 @@ function normalisedSearchUrl(value: string): string {
   try {
     const url = new URL(value)
     url.hash = ''
-    url.hostname = url.hostname.toLowerCase().replace(/^www\\./, '')
+    url.hostname = url.hostname.toLowerCase().replace(/^www\./, '')
     for (const key of [...url.searchParams.keys()]) {
       if (/^(utm_.+|gclid|fbclid|mc_cid|mc_eid|ref_src|source)$/i.test(key)) {
         url.searchParams.delete(key)
       }
     }
     url.searchParams.sort()
-    if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\\/+$/, '')
-    return url.toString().replace(/\\/$/, url.pathname === '/' ? '/' : '')
+    if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\/+$/, '')
+    return url.toString().replace(/\/$/, url.pathname === '/' ? '/' : '')
   } catch {
     return value.trim()
   }
