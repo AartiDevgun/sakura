@@ -1055,7 +1055,7 @@ sourceIndexes must refer only to supplied sourceIndex numbers. The angles are hy
     result = await askForJson(RESEARCH_SYSTEM, buildAnglePrompt(evidenceRows), signal)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    if (!/Groq request payload was too large \\(413\\)/i.test(message) || evidenceRows.length === 0) {
+    if (!/Groq request payload was too large \(413\)/i.test(message) || evidenceRows.length === 0) {
       throw error
     }
 
@@ -1072,7 +1072,7 @@ sourceIndexes must refer only to supplied sourceIndex numbers. The angles are hy
         batchResults.push(await askForJson(RESEARCH_SYSTEM, buildAnglePrompt(rows), signal))
       } catch (batchError) {
         const batchMessage = batchError instanceof Error ? batchError.message : String(batchError)
-        if (!/Groq request payload was too large \\(413\\)/i.test(batchMessage) || rows.length <= 1) {
+        if (!/Groq request payload was too large \(413\)/i.test(batchMessage) || rows.length <= 1) {
           throw batchError
         }
         // Split adaptively only if a batch is still too large. Overlap one source
@@ -1090,7 +1090,8 @@ sourceIndexes must refer only to supplied sourceIndex numbers. The angles are hy
       await requestBatch(evidenceRows.slice(start, start + 4))
     }
 
-    const firstAngles = Array.isArray(batchResults[0]?.angles) ? batchResults[0].angles : []
+    const firstBatch = batchResults[0]
+    const firstAngles = firstBatch && Array.isArray(firstBatch.angles) ? firstBatch.angles : []
     const mandatoryAngles = firstAngles.slice(0, 3)
     const optionalAngles = batchResults.flatMap(batch => (
       Array.isArray(batch.angles) ? batch.angles.slice(3) : []
