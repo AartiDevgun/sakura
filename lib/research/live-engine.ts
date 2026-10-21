@@ -355,82 +355,137 @@ async function searchWithExa(query: string, signal?: AbortSignal): Promise<Searc
   )
 }
 
-async function searchWeb(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
-  let tavilyResults: SearchResult[] = []
-  let tavilyError: unknown
+async function searchWithTavily(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
+  return cachedJson<SearchResult[]>(
+    'tavily-search',
+    query.trim().toLowerCase(),
+    SEARCH_CACHE_TTL_SECONDS,
+    async () => {
+      // Check configuration before consuming the daily provider allowance.
+      const apiKey = requiredEnv('TAVILY_API_KEY')
+      const dailyLimit = Number.parseInt(
+        process.env.SAKURA_TAVILY_DAILY_LIMIT ?? '25',
+        10,
+      )
+      if (!Number.isSafeInteger(dailyLimit) || dailyLimit < 1) {
+        throw new Error('Invalid SAKURA Tavily daily limit.')
+      }
 
-  try {
-    tavilyResults = await cachedJson<SearchResult[]>(
-      'tavily-search',
-      query.trim().toLowerCase(),
-      SEARCH_CACHE_TTL_SECONDS,
-      async () => {
-        // Check configuration before consuming the daily provider allowance.
-        const apiKey = requiredEnv('TAVILY_API_KEY')
-        const dailyLimit = Number.parseInt(
-          process.env.SAKURA_TAVILY_DAILY_LIMIT ?? '25',
-          10,
-        )
-        if (!Number.isSafeInteger(dailyLimit) || dailyLimit < 1) {
-          throw new Error('Invalid SAKURA Tavily daily limit.')
+      // The shared Redis counter is checked before every fresh Tavily request.
+      await consumeDailyBudget('tavily', dailyLimit)
+
+      const response = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          api_key: apiKey,
+          query,
+          topic: 'general',
+          search_depth: 'basic',
+          max_results: 6,
+          include_raw_content: true,
+          include_answer: false,
+        }),
+        signal,
+        cache: 'no-store',
+      })
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('Tavily authentication failed. Check TAVILY_API_KEY in the sakura_ui Vercel project.')
         }
-
-        // The shared Redis counter is checked before every fresh Tavily request.
-        await consumeDailyBudget('tavily', dailyLimit)
-
-        const response = await fetch('https://api.tavily.com/search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            api_key: apiKey,
-            query,
-            topic: 'general',
-            search_depth: 'basic',
-            max_results: 6,
-            include_raw_content: true,
-            include_answer: false,
-          }),
-          signal,
-          cache: 'no-store',
-        })
-
-        if (!response.ok) {
-          throw new Error('Tavily web search failed (' + response.status + ').')
+        if (response.status === 429) {
+          throw new Error('Tavily rate or usage limit reached. Check the Tavily dashboard before retrying.')
         }
+        throw new Error('Tavily web search failed (' + response.status + ').')
+      }
 
-        const result = (await response.json()) as { results?: SearchResult[] }
-        return Array.isArray(result.results) ? result.results : []
-      },
-    )
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') throw error
-    tavilyError = error
-  }
+      const result = (await response.json()) as { results?: SearchResult[] }
+      return (Array.isArray(result.results) ? result.results : []).filter(isUsableSearchResult)
+    },
+  )
+}
 
-  const usableTavily = tavilyResults.filter(isUsableSearchResult)
-  // Prefer any usable Tavily result. Exa is the reserve provider, not a second
-  // search for every query with only one good Tavily result; this preserves fallback credits.
-  if (usableTavily.length > 0) return usableTavily
-
+function normalisedSearchUrl(value: string): string {
   try {
-    const exaResults = await searchWithExa(query, signal)
-    const merged = [...usableTavily, ...exaResults].filter(isUsableSearchResult)
-    if (merged.length > 0) return merged
-    if (tavilyError instanceof Error) throw tavilyError
-    return []
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') throw error
-    // Preserve partial Tavily results if Exa is temporarily unavailable; later evidence
-    // quality checks still decide whether those sources are enough to support a report.
-    if (usableTavily.length > 0) return usableTavily
-    // When both providers fail, expose both safe diagnostics instead of masking a Tavily
-    // authentication/quota issue behind the Exa fallback-cap message.
-    if (tavilyError instanceof Error) {
-      const fallbackMessage = error instanceof Error ? error.message : 'Exa web search failed.'
-      throw new Error(fallbackMessage + ' Tavily search also failed: ' + tavilyError.message)
+    const url = new URL(value)
+    url.hash = ''
+    url.hostname = url.hostname.toLowerCase().replace(/^www\\./, '')
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(utm_.+|gclid|fbclid|mc_cid|mc_eid|ref_src|source)$/i.test(key)) {
+        url.searchParams.delete(key)
+      }
     }
-    throw error
+    url.searchParams.sort()
+    if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\\/+$/, '')
+    return url.toString().replace(/\\/$/, url.pathname === '/' ? '/' : '')
+  } catch {
+    return value.trim()
   }
+}
+
+/** Merge both search providers without letting duplicate URLs masquerade as independent evidence. */
+function mergeSearchResults(tavilyResults: SearchResult[], exaResults: SearchResult[]): SearchResult[] {
+  const merged = new Map<string, SearchResult>()
+
+  for (const candidate of [...tavilyResults, ...exaResults].filter(isUsableSearchResult)) {
+    const key = normalisedSearchUrl(candidate.url ?? '')
+    const previous = merged.get(key)
+    if (!previous) {
+      merged.set(key, candidate)
+      continue
+    }
+
+    const previousContent = text(previous.raw_content, text(previous.content))
+    const candidateContent = text(candidate.raw_content, text(candidate.content))
+    const bestContent = candidateContent.length > previousContent.length ? candidateContent : previousContent
+    merged.set(key, {
+      ...previous,
+      title: (previous.title?.length ?? 0) >= (candidate.title?.length ?? 0) ? previous.title : candidate.title,
+      content: bestContent,
+      raw_content: bestContent,
+      published_date: previous.published_date || candidate.published_date,
+      score: Math.max(previous.score ?? 0, candidate.score ?? 0),
+    })
+  }
+
+  return [...merged.values()]
+}
+
+async function searchWeb(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
+  // Run both independent search providers for each fresh query. Groq is used later
+  // for analysis; it does not search the web. Provider budgets/caches are enforced
+  // separately, and a healthy provider's results remain usable if the other fails.
+  const [tavilyOutcome, exaOutcome] = await Promise.allSettled([
+    searchWithTavily(query, signal),
+    searchWithExa(query, signal),
+  ])
+
+  if (signal?.aborted) throw new DOMException('Request cancelled.', 'AbortError')
+
+  const tavilyResults = tavilyOutcome.status === 'fulfilled' ? tavilyOutcome.value : []
+  const exaResults = exaOutcome.status === 'fulfilled' ? exaOutcome.value : []
+  const usable = mergeSearchResults(tavilyResults, exaResults)
+
+  if (usable.length > 0) {
+    if (tavilyOutcome.status === 'rejected') {
+      console.warn('[SAKURA] Tavily search unavailable; using Exa results for this query.')
+    }
+    if (exaOutcome.status === 'rejected') {
+      console.warn('[SAKURA] Exa search unavailable; using Tavily results for this query.')
+    }
+    return usable
+  }
+
+  const tavilyError = tavilyOutcome.status === 'rejected' ? tavilyOutcome.reason : null
+  const exaError = exaOutcome.status === 'rejected' ? exaOutcome.reason : null
+  const messageOf = (error: unknown) => error instanceof Error ? error.message : 'Search provider failed.'
+  if (tavilyError && exaError) {
+    throw new Error(messageOf(tavilyError) + ' Exa search also failed: ' + messageOf(exaError))
+  }
+  if (tavilyError) throw tavilyError
+  if (exaError) throw exaError
+  return []
 }
 async function cachedSearchOnly(query: string): Promise<SearchResult[]> {
   try {
