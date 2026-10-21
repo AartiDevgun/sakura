@@ -1023,9 +1023,8 @@ export async function liveResearch(
   signal?: AbortSignal,
 ): Promise<ResearchResponse> {
   const sources = await collectEvidence(company, undefined, signal)
-  const result = await askForJson(
-    RESEARCH_SYSTEM,
-    `Investigate ${company} for Track A: Banking, NBFCs & Financial Services. Company profile and metric priorities: ${profileDescription(company)} Create up to eight distinct research angles. The first three entries MUST be the mandatory hypotheses in exactly this order, so the app can test them first:
+  const evidenceRows = evidenceForPrompt(sources)
+  const buildAnglePrompt = (rows: typeof evidenceRows) => `Investigate ${company} for Track A: Banking, NBFCs & Financial Services. Company profile and metric priorities: ${profileDescription(company)} Create up to eight distinct research angles. The first three entries MUST be the mandatory hypotheses in exactly this order, so the app can test them first:
 1. Loan-book growth versus asset quality: compare advances/AUM/disbursements with gross and net NPAs, credit costs, provisioning, delinquency or collection metrics over comparable periods. If it is not a lender, state that limitation in the rationale and test an applicable financial-services equivalent.
 2. Hidden funding, partner and ecosystem dependencies: use bank/co-lending/funder disclosures, liability composition, joint ventures, related parties, regulator/exchange filings and counterparty/partner announcements; look beyond the company’s own statements.
 3. Five-year funding mix/customer profile: compare funding/liability mix, customer composition, or lending mix across roughly five years and explain observed changes only when disclosures support the explanation.
@@ -1033,7 +1032,7 @@ After those three, generate up to five MORE materially different company-specifi
 For each additional angle, explain what concrete observation would confirm or disprove it. Exclude angles unsupported by the supplied source excerpts, but explore every distinct plausible line of inquiry visible from them. Do not treat a rating-agency rationale as a substitute for company filings or exchange-published financial results. Rank optional angles by preliminary evidence signal (strong, then moderate, then weak); the mandatory three must stay first. Adapt the mandatory hypotheses to the company profile above: life insurers should not be evaluated using NIM, advances or NPA metrics; diversified groups should be assessed by relevant segments rather than assuming a pure-bank business model. Do not declare any hypothesis a finding until it has been investigated.
 
 Use this evidence:
-${JSON.stringify(evidenceForPrompt(sources))}
+${JSON.stringify(rows)}
 
 Return JSON in this exact shape:
 {
@@ -1048,9 +1047,80 @@ Return JSON in this exact shape:
   ]
 }
 
-sourceIndexes must refer only to supplied sourceIndex numbers. The angles are hypotheses to test, not confirmed findings. Do not force numerical claims if the sources do not support them.`,
-    signal,
-  )
+sourceIndexes must refer only to supplied sourceIndex numbers. The angles are hypotheses to test, not confirmed findings. Do not force numerical claims if the sources do not support them.`
+
+  let result: JsonObject
+  try {
+    // Keep the complete source set and full excerpts on the normal path.
+    result = await askForJson(RESEARCH_SYSTEM, buildAnglePrompt(evidenceRows), signal)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!/Groq request payload was too large \\(413\\)/i.test(message) || evidenceRows.length === 0) {
+      throw error
+    }
+
+    // Do not truncate evidence to fit. Retry with overlapping source batches so every
+    // selected excerpt reaches the model intact; merge all candidate angles afterward.
+    console.warn('[SAKURA] Groq rejected the full angle prompt; retrying all evidence in overlapping batches.', {
+      sourceCount: evidenceRows.length,
+      excerptCharacters: evidenceRows.reduce((sum, row) => sum + row.excerpt.length, 0),
+    })
+
+    const batchResults: JsonObject[] = []
+    const requestBatch = async (rows: typeof evidenceRows): Promise<void> => {
+      try {
+        batchResults.push(await askForJson(RESEARCH_SYSTEM, buildAnglePrompt(rows), signal))
+      } catch (batchError) {
+        const batchMessage = batchError instanceof Error ? batchError.message : String(batchError)
+        if (!/Groq request payload was too large \\(413\\)/i.test(batchMessage) || rows.length <= 1) {
+          throw batchError
+        }
+        // Split adaptively only if a batch is still too large. Overlap one source
+        // whenever possible to preserve cross-document context around batch edges.
+        const midpoint = Math.ceil(rows.length / 2)
+        const rightStart = rows.length > 2 ? midpoint - 1 : midpoint
+        await requestBatch(rows.slice(0, midpoint))
+        await requestBatch(rows.slice(rightStart))
+      }
+    }
+
+    // Start with manageable batches after the full-prompt 413; all evidence rows
+    // are covered and adjacent batches share one row where possible.
+    for (let start = 0; start < evidenceRows.length; start += 3) {
+      await requestBatch(evidenceRows.slice(start, start + 4))
+    }
+
+    const firstAngles = Array.isArray(batchResults[0]?.angles) ? batchResults[0].angles : []
+    const mandatoryAngles = firstAngles.slice(0, 3)
+    const optionalAngles = batchResults.flatMap(batch => (
+      Array.isArray(batch.angles) ? batch.angles.slice(3) : []
+    ))
+    const normalizeAngleKey = (value: unknown) => text(value)
+      .toLocaleLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+    const seen = new Set(mandatoryAngles.map(value => {
+      const item = record(value)
+      return normalizeAngleKey(item.title) || normalizeAngleKey(item.label)
+    }))
+    const uniqueOptional: unknown[] = []
+    for (const value of optionalAngles) {
+      const item = record(value)
+      const key = normalizeAngleKey(item.title) || normalizeAngleKey(item.label)
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      uniqueOptional.push(value)
+    }
+    const rank = (value: unknown) => {
+      const strength = record(value).signalStrength
+      return strength === 'strong' ? 3 : strength === 'moderate' ? 2 : 1
+    }
+    uniqueOptional.sort((a, b) => rank(b) - rank(a))
+    result = {
+      ...(batchResults[0] ?? {}),
+      angles: [...mandatoryAngles, ...uniqueOptional].slice(0, 8),
+    }
+  }
 
   const rawAngles = Array.isArray(result.angles) ? result.angles : []
   if (rawAngles.length === 0) {
