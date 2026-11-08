@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowUpRight, LoaderCircle, Sparkles } from 'lucide-react'
 import { postJson } from '@/lib/research/client'
+import { ParagraphText } from './paragraph-text'
 import {
   followupResponseSchema,
   type BackendMode,
@@ -107,8 +108,8 @@ export function FollowupPanel({
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-pink-300/75">Follow-up finding</p>
             <button type="button" onClick={() => setAnswer(null)} className="text-xs text-rose-100/45 underline underline-offset-4 hover:text-rose-50">Clear answer</button>
           </div>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-rose-50/85">{answer.answer}</p>
-          {answer.caveat ? <p className="mt-3 text-sm leading-6 text-amber-100/65">{answer.caveat}</p> : null}
+          <ParagraphText text={answer.answer} className="mt-2 space-y-3 text-sm leading-7 text-rose-50/85" paragraphClassName="" />
+          {answer.caveat ? <ParagraphText text={answer.caveat} className="mt-3 space-y-2 text-sm leading-6 text-amber-100/65" paragraphClassName="" /> : null}
           {answer.sources.length > 0 ? (
             <div className="mt-4 space-y-2">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-rose-100/45">Sources checked</p>

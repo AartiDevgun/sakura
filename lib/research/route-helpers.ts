@@ -38,10 +38,33 @@ export function errorResponse(error: unknown) {
       message.startsWith('Invalid SAKURA Tavily daily limit.') ||
       message.startsWith('Invalid SAKURA Groq daily limit.') ||
       message.startsWith('Invalid SAKURA Gemini daily limit.') ||
+      message.startsWith('Invalid SAKURA daily limit for ') ||
+      message.startsWith('Invalid SAKURA_RESEARCH_PROVIDER.') ||
+      message.startsWith('SAKURA is set to Groq-only mode, but GROQ_API_KEY is not configured') ||
+      message.startsWith('EXA_API_KEY is not configured') ||
+      message.startsWith('Invalid SAKURA_EXA_DAILY_LIMIT.') ||
+      message.startsWith('Exa authentication failed.') ||
+      message.startsWith('Exa credits or usage access are unavailable.') ||
+      message.startsWith('Exa rate or usage limit reached.') ||
+      message.startsWith('Exa web search failed (') ||
+      message.startsWith('Daily Exa search allowance reached.') ||
+      message.startsWith('Gemini research is selected but GEMINI_API_KEY is not configured') ||
+      message.startsWith('No usable public sources were found after trying targeted searches.') ||
+      message.startsWith('Search returned pages, but none contained usable independent source text.') ||
+      message.startsWith('Redis request failed (') ||
+      message === 'Redis command failed.' ||
+      message.startsWith('Cache expiry must be an integer') ||
       message.startsWith('Web search failed (') ||
       message.startsWith('AI analysis failed (') ||
       message.startsWith('Groq authentication failed.') ||
       message.startsWith('Gemini authentication failed.') ||
+      message.startsWith('Gemini could not find model') ||
+      message.startsWith('Gemini rejected the research request (') ||
+      message.startsWith('Gemini research request failed (') ||
+      message.startsWith('Gemini could not process the research prompt.') ||
+      message.startsWith('Gemini returned an empty research response.') ||
+      message.startsWith('Gemini returned invalid JSON.') ||
+      message.startsWith('Gemini stopped before completing the report JSON') ||
       message.startsWith('Gemini rejected the chat request.') ||
       message.startsWith('Gemini rate or usage limit reached.') ||
       message.startsWith('Gemini chat request failed (') ||
@@ -49,7 +72,11 @@ export function errorResponse(error: unknown) {
       message.startsWith('Gemini could not answer that question due to its safety filters.') ||
       message.startsWith('Groq could not find the configured model') ||
       message.startsWith('Groq rate or usage limit reached.') ||
+      message.startsWith("Groq's token-per-minute window is still full") ||
+      message.startsWith('Groq rejected this single request because it') ||
       message.startsWith('Groq analysis request failed (') ||
+      message.startsWith('Groq chat request failed (') ||
+      message.startsWith('Groq rejected the chat request (') ||
       message.startsWith('Groq request payload was too large (413).') ||
       message.startsWith('No usable public sources were found after trying fallback searches.') ||
       message.startsWith('Search results were returned, but none contained usable source text.') ||
@@ -68,20 +95,38 @@ export function errorResponse(error: unknown) {
     if (safeOperationalError) {
       const clientError = message.startsWith('Research session expired') ||
         message.startsWith('The selected research angle')
-      const providerError = message.startsWith('Gemini authentication failed') ||
+      const providerError = message.startsWith('Gemini research is selected but GEMINI_API_KEY is not configured') ||
+        message.startsWith('EXA_API_KEY is not configured') ||
+        message.startsWith('Exa authentication failed.') ||
+        message.startsWith('Exa web search failed (') ||
+        message.startsWith('Gemini authentication failed') ||
+        message.startsWith('Gemini could not find model') ||
+        message.startsWith('Gemini rejected the research request') ||
+        message.startsWith('Gemini research request failed') ||
+        message.startsWith('Gemini could not process the research prompt') ||
+        message.startsWith('Gemini returned an empty research response') ||
+        message.startsWith('Gemini returned invalid JSON') ||
+        message.startsWith('Gemini stopped before completing the report JSON') ||
         message.startsWith('Gemini rejected the chat request') ||
         message.startsWith('Gemini chat request failed') ||
         message.startsWith('Gemini request payload was too large') ||
         message.startsWith('Web search failed') ||
         message.startsWith('AI analysis failed') ||
         message.startsWith('Groq authentication failed') ||
+        message.startsWith('Groq rejected this single request because it') ||
         message.startsWith('Groq could not find the configured model') ||
         message.startsWith('Groq analysis request failed') ||
+        message.startsWith('Groq chat request failed') ||
+        message.startsWith('Groq rejected the chat request') ||
         message.startsWith('Groq request payload was too large')
       const quotaError = message.startsWith('Daily Gemini analysis allowance reached') ||
         message.startsWith('Gemini rate or usage limit reached') ||
         message.startsWith('Daily Groq analysis allowance reached') ||
+        message.startsWith("Groq's token-per-minute window is still full") ||
         message.startsWith('Daily Tavily search allowance reached') ||
+        message.startsWith('Daily Exa search allowance reached') ||
+        message.startsWith('Exa rate or usage limit reached.') ||
+        message.startsWith('Exa credits or usage access are unavailable.') ||
         message.startsWith('Groq rate or usage limit reached')
       return NextResponse.json(
         { error: message },

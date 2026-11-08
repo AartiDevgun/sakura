@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react'
 import { MessageCircle, Send, Sparkles, X } from 'lucide-react'
+import { ParagraphText } from './paragraph-text'
 
 type Message = { role: 'user' | 'assistant'; content: string }
 type Mood = 'smile' | 'wink' | 'happy' | 'curious'
@@ -91,7 +92,7 @@ export function SakuraBuddy() {
           <div className="flex-1 space-y-3 overflow-y-auto p-3" aria-live="polite">
             {messages.map((message, index) => (
               <div key={index} className={message.role === 'user' ? 'ml-7 rounded-2xl rounded-br-sm bg-pink-200/15 px-3.5 py-3 text-sm leading-6 text-pink-50' : 'mr-5 rounded-2xl rounded-bl-sm border border-pink-200/10 bg-white/[0.035] px-3.5 py-3 text-sm leading-6 text-rose-50/85'}>
-                {message.content}
+                <ParagraphText text={message.content} className="space-y-2" paragraphClassName="text-sm leading-6" />
               </div>
             ))}
             {busy ? <div className="mr-5 flex items-center gap-2 rounded-2xl border border-pink-200/10 px-3 py-3 text-sm text-pink-200/70"><span className="h-2 w-2 animate-pulse rounded-full bg-pink-300" /> Sakura is thinking…</div> : null}

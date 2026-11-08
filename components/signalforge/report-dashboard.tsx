@@ -3,17 +3,23 @@
 import { useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { ArrowUpRight, BookOpen, CalendarDays, ChartNoAxesCombined, FlaskConical, MessageCircle, Network, Sparkles, type LucideIcon } from 'lucide-react'
-import type { BackendMode, InvestigationResponse, ResearchResponse } from '@/lib/research/schema'
+import type { BackendMode, InvestigationResponse, ResearchAngle, ResearchResponse } from '@/lib/research/schema'
+import { assessDiscovery, isVerifiedDiscovery } from '@/lib/research/discovery-quality'
 import { CounterargumentExplorer } from './counterargument-explorer'
 import { FollowupPanel } from './follow-up-panel'
 import { PeekRating } from './peek-rating'
+import { JellyRadio } from './jelly-radio'
+import { DiscoveryFlipCard } from './discovery-flip-card'
+import { ParagraphText } from './paragraph-text'
+import { PeerComparisonPanel } from './peer-comparison-panel'
 
-type SectionKey = 'overview' | 'discovery' | 'evidence' | 'numbers' | 'timeline' | 'challenge' | 'sources' | 'followup'
+type SectionKey = 'overview' | 'discovery' | 'evidence' | 'peers' | 'numbers' | 'timeline' | 'challenge' | 'sources' | 'followup'
 
 const SECTIONS: { id: SectionKey; label: string; icon: LucideIcon; note: string }[] = [
   { id: 'overview', label: 'Full report', icon: BookOpen, note: 'All required outputs' },
   { id: 'discovery', label: 'Discovery', icon: Sparkles, note: 'The signal' },
   { id: 'evidence', label: 'Evidence trail', icon: Network, note: 'What supports it' },
+  { id: 'peers', label: 'Peer context', icon: Network, note: 'Company vs peers' },
   { id: 'numbers', label: 'Numbers', icon: ChartNoAxesCombined, note: 'Calculated changes' },
   { id: 'timeline', label: 'Timeline', icon: CalendarDays, note: 'When it emerged' },
   { id: 'challenge', label: 'Challenge it', icon: FlaskConical, note: 'Alternatives & falsification' },
@@ -25,26 +31,41 @@ const SECTIONS: { id: SectionKey; label: string; icon: LucideIcon; note: string 
 export function ReportDashboard({
   research,
   investigation,
+  discoveries,
   backendMode,
+  onSelectDiscovery,
   onExploreAngles,
   onFollowupBusyChange,
 }: {
   research: ResearchResponse
   investigation: InvestigationResponse
+  discoveries: InvestigationResponse[]
   backendMode: BackendMode
+  onSelectDiscovery: (angleId: string) => void
   onExploreAngles: () => void
   onFollowupBusyChange: (busy: boolean) => void
 }) {
   const [active, setActive] = useState<SectionKey>('overview')
-  const [flipped, setFlipped] = useState(false)
   const reduce = useReducedMotion()
   const report = investigation.report
   const discovery = investigation.discovery
   const selectedAngle = research.angles.find(angle => angle.id === investigation.angleId)
+  const discoveryOptions: ResearchAngle[] = discoveries.map((item, index) => {
+    const angle = research.angles.find(candidate => candidate.id === item.angleId)
+    return {
+      id: item.angleId,
+      label: angle?.label || `Discovery ${index + 1}`,
+      title: item.discovery.headline,
+      rationale: item.discovery.summary,
+      signalStrength: item.discovery.confidence === 'high' ? 'strong' : item.discovery.confidence === 'medium' ? 'moderate' : 'weak',
+    }
+  })
   const cited = new Set((report.evidence ?? []).map(item => item.sourceId))
   const primaryCount = report.sources.filter(source => source.sourceTier === 'primary').length
   const independentPublisherCount = new Set(report.sources.map(source => { try { return new URL(source.url).hostname.replace(/^www\./, '').toLowerCase() } catch { return source.publisher?.toLowerCase() || source.id } })).size
   const confidenceLabel = discovery.confidence === 'high' ? 'Strong' : discovery.confidence === 'medium' ? 'Moderate' : 'Weak'
+  const verifiedCount = discoveries.filter(isVerifiedDiscovery).length
+  const selectedAssessment = assessDiscovery(investigation)
 
   return (
     <section className="space-y-5" aria-labelledby="research-report-heading">
@@ -55,17 +76,33 @@ export function ReportDashboard({
           <p className="mt-1 text-sm text-rose-100/45">Banking, NBFCs & financial services · Public-evidence investigation</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <StatChip label="Angles tested" value={String(Math.min(research.angles.length, 3))} />
+          <StatChip label="Verified findings" value={String(verifiedCount)} />
           <StatChip label="Sources" value={String(report.sources.length)} />
           <StatChip label="Primary" value={String(primaryCount)} />
           <StatChip label="Evidence strength" value={confidenceLabel} />
         </div>
       </div>
 
+      {verifiedCount === 0 ? (
+        <div className="rounded-2xl border border-amber-200/20 bg-amber-950/20 px-4 py-3 text-xs leading-6 text-amber-100/80">
+          No tested angle met the minimum verification gate. The report below is a diagnostic candidate, not a verified discovery. {selectedAssessment.reason}
+        </div>
+      ) : null}
+
       <div className="rounded-2xl border border-pink-200/10 bg-black/35 px-4 py-3 sm:flex sm:items-center sm:gap-4">
         <p className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.17em] text-pink-300/60">Hypothesis tested</p>
         <p className="mt-1 text-xs leading-5 text-rose-100/65 sm:mt-0">{selectedAngle?.title || 'The strongest hypothesis supported by the retrieved public evidence'}</p>
       </div>
+
+      {discoveries.length > 1 ? (
+        <JellyRadio
+          angles={discoveryOptions}
+          company={research.company}
+          heading="Priority discoveries"
+          activeId={investigation.angleId}
+          onSelect={onSelectDiscovery}
+        />
+      ) : null}
 
       <div className="rounded-2xl border border-pink-200/10 bg-black/40 p-2 backdrop-blur-md">
         <div className="flex gap-1.5 overflow-x-auto pb-0.5" role="tablist" aria-label="Research report sections">
@@ -96,16 +133,7 @@ export function ReportDashboard({
       <div id="sakura-report-panel" role="tabpanel" aria-labelledby={'sakura-tab-' + active} className="min-h-[350px] outline-none">
         {active === 'overview' ? (
           <div className="space-y-4">
-            <article className="rounded-3xl border border-pink-200/20 bg-gradient-to-br from-[#210b19]/85 via-[#0b080b]/95 to-black p-6 sm:p-8">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-pink-200/20 bg-pink-200/[0.07] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-pink-200">Track & company</span>
-                <span className="rounded-full border border-white/10 px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-rose-100/55">{confidenceLabel} evidence strength</span>
-              </div>
-              <p className="mt-3 text-xs text-rose-100/45">Track A · Banking, NBFCs & Financial Services · {research.company}</p>
-              <h3 className="mt-5 text-2xl font-semibold leading-tight text-rose-50 sm:text-4xl">{discovery.headline}</h3>
-              <p className="mt-4 text-sm leading-7 text-rose-100/70 sm:text-base">{discovery.summary}</p>
-              <p className="mt-4 text-xs leading-6 text-rose-100/45">Evidence strength rationale: {discovery.confidenceReason || 'The report has not supplied a specific confidence rationale; interpret the strength label cautiously.'}</p>
-            </article>
+            <DiscoveryFlipCard company={research.company} discovery={discovery} report={report} />
 
             <ReportSection title="Why it matters" subtitle="Significance of the finding">
               {discovery.whyItMatters && discovery.whyItMatters.length > 0 ? (
@@ -128,7 +156,7 @@ export function ReportDashboard({
               {report.timeline.length > 0 ? <div className="space-y-3">{[...report.timeline].sort((a, b) => { const yearA = Number(a.date.match(/(?:19|20)\d{2}/)?.[0] ?? 0); const yearB = Number(b.date.match(/(?:19|20)\d{2}/)?.[0] ?? 0); return yearA - yearB || Date.parse(a.date) - Date.parse(b.date) }).map((event, index) => {
                 const source = report.sources.find(candidate => candidate.id === event.sourceId)
                 return <div key={event.date + '-overview-' + index} className="rounded-xl border border-pink-200/10 bg-black/30 p-4">
-                  <p className="text-xs font-semibold text-pink-300">{event.date}</p><p className="mt-2 text-sm leading-6 text-rose-50/80">{event.event}</p>
+                  <p className="text-xs font-semibold text-pink-300">{event.date}</p><ParagraphText text={event.event} className="mt-2 space-y-2 text-sm leading-6 text-rose-50/80" paragraphClassName="" />
                   {event.quote ? <blockquote className="mt-2 border-l-2 border-pink-300/35 pl-3 text-xs leading-5 text-rose-100/50">“{event.quote}”</blockquote> : null}
                   {source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs text-pink-300 underline underline-offset-4">{source.title} ↗</a> : null}
                 </div>
@@ -137,17 +165,17 @@ export function ReportDashboard({
 
             <ReportSection title="Numbers" subtitle="Calculations used to substantiate the discovery">
               {report.calculations.length > 0 ? <div className="space-y-3">{report.calculations.map((calc, index) => <div key={calc.label + '-overview-' + index} className="rounded-xl border border-pink-200/10 bg-black/30 p-4">
-                <p className="text-sm font-semibold text-rose-50">{calc.label}</p><p className="mt-2 text-2xl font-semibold text-pink-200">{calc.result}</p><p className="mt-2 font-mono text-xs leading-5 text-rose-100/50">{calc.formula}</p><p className="mt-2 text-sm leading-6 text-rose-100/60">{calc.interpretation}</p>
+                <p className="text-sm font-semibold text-rose-50">{calc.label}</p><p className="mt-2 text-2xl font-semibold text-pink-200">{calc.result}</p><p className="mt-2 font-mono text-xs leading-5 text-rose-100/50">{calc.formula}</p><ParagraphText text={calc.interpretation} className="mt-2 space-y-2 text-sm leading-6 text-rose-100/60" paragraphClassName="" />
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">{calc.inputs.map((input, i) => { const source = report.sources.find(candidate => candidate.id === input.sourceId); return <div key={input.name + i} className="rounded-lg border border-white/[0.07] p-3"><p className="text-[10px] uppercase tracking-wide text-rose-100/35">{input.name}</p><p className="mt-1 text-sm text-rose-50">{input.value}</p>{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs text-pink-300 underline underline-offset-4">{source.title} ↗</a> : <p className="mt-1 text-xs text-amber-100/60">Input source unavailable</p>}</div> })}</div>
               </div>)}</div> : <p className="text-sm text-rose-100/50">No calculations passed validation. The report must not imply the metric stayed unchanged.</p>}
             </ReportSection>
 
             <ReportSection title="Counterargument" subtitle="The strongest alternative explanation">
-              {report.counterarguments.length > 0 ? <div className="space-y-3">{report.counterarguments.map((item, index) => { const source = report.sources.find(candidate => candidate.id === item.sourceId); return <div key={item.argument + index} className="rounded-xl border border-amber-200/10 bg-amber-950/10 p-4"><p className="text-sm font-semibold text-rose-50">{item.argument}</p><p className="mt-2 text-sm leading-6 text-rose-100/60">{item.assessment}</p>{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs text-pink-300 underline underline-offset-4">{source.title} ↗</a> : <p className="mt-2 text-xs text-amber-100/60">No linked source for this alternative; it is not independently substantiated.</p>}</div> })}</div> : <p className="text-sm text-amber-100/65">No counterargument was returned. This report is incomplete until a credible alternative explanation is tested.</p>}
+              {report.counterarguments.length > 0 ? <div className="space-y-3">{report.counterarguments.map((item, index) => { const source = report.sources.find(candidate => candidate.id === item.sourceId); return <div key={item.argument + index} className="rounded-xl border border-amber-200/10 bg-amber-950/10 p-4"><p className="text-sm font-semibold text-rose-50">{item.argument}</p><ParagraphText text={item.assessment} className="mt-2 space-y-2 text-sm leading-6 text-rose-100/60" paragraphClassName="" />{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs text-pink-300 underline underline-offset-4">{source.title} ↗</a> : <p className="mt-2 text-xs text-amber-100/60">No linked source for this alternative; it is not independently substantiated.</p>}</div> })}</div> : <p className="text-sm text-amber-100/65">No counterargument was returned. This report is incomplete until a credible alternative explanation is tested.</p>}
             </ReportSection>
 
             <ReportSection title="Falsification condition" subtitle="What future evidence would make SAKURA reconsider">
-              <p className="text-sm leading-7 text-rose-50/80">{report.falsification.condition}</p>
+              <ParagraphText text={report.falsification.condition} className="space-y-2 text-sm leading-7 text-rose-50/80" paragraphClassName="" />
               {report.falsification.metric ? <p className="mt-2 text-xs text-rose-100/50">Metric to monitor: {report.falsification.metric}</p> : null}
               {report.falsification.checkBy ? <p className="mt-1 text-xs text-rose-100/50">Reassess by: {report.falsification.checkBy}</p> : null}
             </ReportSection>
@@ -165,95 +193,10 @@ export function ReportDashboard({
         ) : null}
         {active === 'discovery' ? (
           <div className="space-y-4">
-            <div className="perspective-[1400px]">
-              <motion.div
-                animate={{ rotateY: flipped ? 180 : 0 }}
-                transition={{ duration: reduce ? 0 : 0.62, ease: [0.2, 0.75, 0.25, 1] }}
-                style={{ transformStyle: 'preserve-3d' }}
-                className="grid"
-              >
-                <div className="col-start-1 row-start-1 flex min-h-[335px] flex-col rounded-3xl border border-pink-200/20 bg-gradient-to-br from-[#210b19]/95 via-[#0b080b]/95 to-black p-6 shadow-[0_0_70px_rgba(236,72,153,0.07)] sm:min-h-[365px] sm:p-8" style={{ backfaceVisibility: 'hidden' }}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-pink-200/20 bg-pink-200/[0.07] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-pink-200">The discovery</span>
-                    <span className="rounded-full border border-white/10 px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-rose-100/55">{confidenceLabel} evidence strength</span>
-                  </div>
-                  <h3 className="mt-6 text-pretty text-2xl font-semibold leading-tight tracking-tight text-rose-50 sm:text-4xl">{discovery.headline}</h3>
-                  <p className="mt-4 max-w-3xl text-sm leading-7 text-rose-100/70 sm:text-base">{discovery.summary}</p>
-                  <div className="mt-auto flex flex-wrap items-end justify-between gap-4 pt-7">
-                    <p className="max-w-sm text-xs leading-5 text-rose-100/35">A hypothesis tested against public sources—not an investment recommendation.</p>
-                    <button type="button" onClick={() => setFlipped(true)} aria-expanded={flipped} className="inline-flex items-center gap-2 rounded-full border border-pink-200/30 bg-pink-200/[0.08] px-4 py-2.5 text-xs font-semibold text-pink-100 transition hover:border-pink-200/60 hover:bg-pink-200/[0.14] focus-visible:outline-2 focus-visible:outline-pink-300">Turn for the reasoning <ArrowUpRight size={14} /></button>
-                  </div>
-                </div>
-                <div className="col-start-1 row-start-1 flex min-h-[335px] flex-col rounded-3xl border border-pink-200/25 bg-[#090609] p-6 sm:min-h-[365px] sm:p-8" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-pink-300/75">What the evidence supports</p>
-                    <span className="text-xs text-rose-100/35">02 / 02</span>
-                  </div>
-                  <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-rose-100/75">{report.thesis}</p>
-                  <h4 className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-pink-200/75">Why it matters</h4>
-                  {discovery.whyItMatters && discovery.whyItMatters.length > 0 ? (
-                    <ul className="mt-2 space-y-2">
-                      {discovery.whyItMatters.slice(0, 5).map((item, index) => <li key={index} className="flex gap-2 text-sm leading-6 text-rose-100/65"><span className="mt-0.5 text-pink-300">↳</span><span>{item}</span></li>)}
-                    </ul>
-                  ) : <p className="mt-2 text-sm leading-6 text-rose-100/55">The available evidence and limitations are described in the thesis and evidence trail.</p>}
-                  {report.evidence && report.evidence.length > 0 ? (
-                    <div className="mt-5 space-y-2">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-pink-200/60">Verified evidence anchors</p>
-                      {report.evidence.slice(0, 2).map((item, index) => {
-                        const source = report.sources.find(candidate => candidate.id === item.sourceId)
-                        return <div key={item.sourceId + '-' + index} className="rounded-xl border border-pink-200/10 bg-black/35 p-3">
-                          <p className="text-xs leading-5 text-rose-100/65">“{item.quote}”</p>
-                          {source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-[10px] text-pink-300 underline underline-offset-4">{source.title} ↗</a> : null}
-                        </div>
-                      })}
-                    </div>
-                  ) : null}
-                  <div className="mt-auto flex flex-wrap items-end justify-between gap-4 pt-5">
-                    <p className="text-xs text-rose-100/35">Confidence: {discovery.confidenceReason || 'Based on the number and provenance of sources, with limitations shown in the report.'}</p>
-                    <button type="button" onClick={() => setFlipped(false)} aria-expanded={flipped} className="shrink-0 rounded-full border border-pink-200/30 px-4 py-2.5 text-xs font-semibold text-pink-100 transition hover:bg-pink-200/[0.08] focus-visible:outline-2 focus-visible:outline-pink-300">Back to discovery ↶</button>
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <MiniMetric icon={<Network size={17} />} label="Evidence trail" value={String((report.evidence ?? []).length) + ' verified passages'} detail="Exact quotes matched to retrieved text" />
-              <MiniMetric icon={<ChartNoAxesCombined size={17} />} label="Calculated metrics" value={String(report.calculations.length)} detail="Results calculated by the app" />
-              <MiniMetric icon={<CalendarDays size={17} />} label="Timeline events" value={String(report.timeline.length)} detail="Source-linked events" />
-            </div>
-
-            {report.evidence && report.evidence.length > 0 ? (
-              <div className="space-y-3 pt-2">
-                <SectionHeading
-                  eyebrow="More from the evidence"
-                  title="Other source-backed findings"
-                  copy="Distinct observations from public sources. Each item appears only when its quoted passage matches the retrieved text."
-                />
-                <div className="grid gap-3 md:grid-cols-2">
-                  {report.evidence.slice(0, 5).map((item, index) => {
-                    const source = report.sources.find(candidate => candidate.id === item.sourceId)
-                    return (
-                      <article key={item.sourceId + '-finding-' + index} className="rounded-2xl border border-pink-200/15 bg-black/45 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-300/70">Finding {String(index + 1).padStart(2, '0')}</p>
-                        <h3 className="mt-2 text-sm font-semibold leading-6 text-rose-50">{item.claim}</h3>
-                        <blockquote className="mt-3 border-l-2 border-pink-300/45 pl-3 text-xs leading-6 text-rose-100/60">“{item.quote}”</blockquote>
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                          {item.date ? <span className="text-[10px] text-rose-100/35">{item.date}</span> : <span />}
-                          {source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-pink-300 underline underline-offset-4">{source.title} ↗</a> : null}
-                        </div>
-                      </article>
-                    )
-                  })}
-                </div>
-              </div>
-            ) : (
-              <EmptyState
-                title="No additional claims passed verification"
-                copy="SAKURA will not invent extra findings. Review the source list or try another research angle to broaden the evidence."
-              />
-            )}
+            <DiscoveryFlipCard company={research.company} discovery={discovery} report={report} />
+            <p className="text-xs leading-5 text-rose-100/45">Flip the card to move between the finding and the reasoning. Source quotations remain linked to their original documents.</p>
           </div>
         ) : null}
-
         {active === 'evidence' ? (
           <div className="space-y-3">
             <SectionHeading eyebrow="Triangulation" title="Follow each claim to its source" copy="Passages appear here only when the returned quote can be matched against the retrieved source text. Open the source to inspect the full public document." />
@@ -282,7 +225,7 @@ export function ReportDashboard({
                 <p className="text-sm font-semibold text-rose-50">{calc.label}</p>
                 <p className="mt-3 text-3xl font-semibold tracking-tight text-pink-200">{calc.result}</p>
                 <p className="mt-2 rounded-lg bg-white/[0.035] px-3 py-2 font-mono text-xs leading-5 text-rose-100/50">{calc.formula}</p>
-                <p className="mt-3 text-sm leading-6 text-rose-100/65">{calc.interpretation}</p>
+                <ParagraphText text={calc.interpretation} className="mt-3 space-y-2 text-sm leading-6 text-rose-100/65" paragraphClassName="" />
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
                   {calc.inputs.map((input, i) => {
                     const source = report.sources.find(candidate => candidate.id === input.sourceId)
@@ -301,7 +244,7 @@ export function ReportDashboard({
               <div className="relative space-y-3 before:absolute before:bottom-5 before:left-[10px] before:top-5 before:w-px before:bg-pink-200/20">
                 {report.timeline.map((event, index) => {
                   const source = report.sources.find(candidate => candidate.id === event.sourceId)
-                  return <article key={event.date + index} className="relative pl-8"><span className="absolute left-[5px] top-5 size-[11px] rounded-full border border-pink-200/65 bg-[#180c14] shadow-[0_0_12px_rgba(244,114,182,0.25)]" /><div className="rounded-2xl border border-pink-200/12 bg-black/45 p-4"><p className="text-xs font-semibold tracking-wide text-pink-300">{event.date}</p><p className="mt-2 text-sm leading-6 text-rose-50/80">{event.event}</p>{event.quote ? <blockquote className="mt-3 border-l-2 border-pink-300/40 pl-3 text-xs leading-5 text-rose-100/45">“{event.quote}”</blockquote> : null}{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-pink-300 underline underline-offset-4">{source.publisher || source.title} ↗</a> : null}</div></article>
+                  return <article key={event.date + index} className="relative pl-8"><span className="absolute left-[5px] top-5 size-[11px] rounded-full border border-pink-200/65 bg-[#180c14] shadow-[0_0_12px_rgba(244,114,182,0.25)]" /><div className="rounded-2xl border border-pink-200/12 bg-black/45 p-4"><p className="text-xs font-semibold tracking-wide text-pink-300">{event.date}</p><ParagraphText text={event.event} className="mt-2 space-y-2 text-sm leading-6 text-rose-50/80" paragraphClassName="" />{event.quote ? <blockquote className="mt-3 border-l-2 border-pink-300/40 pl-3 text-xs leading-5 text-rose-100/45">“{event.quote}”</blockquote> : null}{source ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-pink-300 underline underline-offset-4">{source.publisher || source.title} ↗</a> : null}</div></article>
                 })}
               </div>
             ) : <EmptyState title="No supported timeline returned" copy="No dated event passed source-quote verification. This does not mean nothing happened; it means SAKURA could not safely establish the sequence from the retrieved excerpts. Try another angle or inspect the source ledger." />}
@@ -313,7 +256,7 @@ export function ReportDashboard({
             <SectionHeading eyebrow="Self-falsification" title="Try to break the conclusion" copy="A strong discovery survives plausible alternative explanations—and states what future evidence could overturn it." />
             <div className="rounded-2xl border border-amber-200/15 bg-amber-950/10 p-5">
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-100/65">Falsification condition</p>
-              <p className="mt-2 text-sm leading-7 text-rose-50/80">{report.falsification.condition}</p>
+              <ParagraphText text={report.falsification.condition} className="mt-2 space-y-2 text-sm leading-7 text-rose-50/80" paragraphClassName="" />
               {report.falsification.metric ? <p className="mt-3 text-xs text-amber-100/55">Monitor: {report.falsification.metric}</p> : null}
               {report.falsification.checkBy ? <p className="mt-1 text-xs text-amber-100/55">Reassess by: {report.falsification.checkBy}</p> : null}
             </div>
@@ -322,6 +265,10 @@ export function ReportDashboard({
               <CounterargumentExplorer items={report.counterarguments} sources={report.sources} />
             </div>
           </div>
+        ) : null}
+
+        {active === 'peers' ? (
+          <PeerComparisonPanel research={research} investigation={investigation} />
         ) : null}
 
         {active === 'followup' ? (

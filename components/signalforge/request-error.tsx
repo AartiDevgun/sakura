@@ -9,19 +9,24 @@ interface RequestErrorProps {
 export function RequestError({ title, message, onRetry }: RequestErrorProps) {
   const tavilyLimit = /Daily Tavily search (?:allowance|limit) reached/i.test(message)
   const groqLimit = /Daily Groq analysis (?:allowance|limit) reached/i.test(message)
+  const groqWindowLimit = /Groq's token-per-minute window is still full/i.test(message)
   const quotaLimit = tavilyLimit || groqLimit
 
   const resolvedTitle = tavilyLimit
     ? 'Daily web-search capacity reached'
     : groqLimit
       ? 'Daily analysis capacity reached'
-      : title
+      : groqWindowLimit
+        ? 'Short AI processing cooldown'
+        : title
 
   const resolvedMessage = tavilyLimit
     ? 'SAKURA has used its daily public web-search allowance. It resets at 05:30 IST. No new discovery was fabricated. To increase capacity, raise SAKURA_TAVILY_DAILY_LIMIT in Vercel Preview only if your Tavily plan allows it.'
     : groqLimit
       ? 'SAKURA has used its daily analysis allowance. It resets at 05:30 IST. To increase capacity, raise SAKURA_GROQ_DAILY_LIMIT in Vercel Preview only if your Groq plan allows it.'
-      : message
+      : groqWindowLimit
+        ? message + ' SAKURA already waited and retried once. This is a temporary per-minute provider limit, not a daily quota; try again after the stated delay.'
+        : message
 
   return (
     <div

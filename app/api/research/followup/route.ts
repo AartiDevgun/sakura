@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
-import { callBackend, getBackendMode } from '@/lib/research/backend'
+import { callBackend, getBackendMode, usesLocalResearchEngine } from '@/lib/research/backend'
 import { liveFollowup } from '@/lib/research/live-engine'
 import { errorResponse, parseBody } from '@/lib/research/route-helpers'
 import { followupRequestSchema, followupResponseSchema } from '@/lib/research/schema'
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   try {
     let result
 
-    if (process.env.TAVILY_API_KEY && process.env.GROQ_API_KEY) {
+    if (usesLocalResearchEngine()) {
       result = await liveFollowup(
         body.data.company,
         body.data.researchId,

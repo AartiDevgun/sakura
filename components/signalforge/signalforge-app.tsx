@@ -7,9 +7,11 @@ import {
   type MockScenario,
   type ResearchResponse,
   type InvestigationResponse,
+  type ResearchAngle,
   researchResponseSchema,
   investigationResponseSchema,
 } from '@/lib/research/schema'
+import { isVerifiedDiscovery, rankDiscoveries } from '@/lib/research/discovery-quality'
 import { cn } from '@/lib/utils'
 import { SakuraParticles } from '@/components/sakura-particles'
 import CrystalizedBall from '@/components/CrystalizedBall'
@@ -31,9 +33,9 @@ type Flow =
   | { step: 'researching'; company: string }
   | { step: 'research-error'; company: string; message: string }
   | { step: 'angles'; research: ResearchResponse }
-  | { step: 'investigating'; research: ResearchResponse; angleId: string }
+  | { step: 'investigating'; research: ResearchResponse; angleId: string; angleIndex?: number; angleTotal?: number }
   | { step: 'investigation-error'; research: ResearchResponse; angleId: string; message: string }
-  | { step: 'result'; research: ResearchResponse; investigation: InvestigationResponse }
+  | { step: 'result'; research: ResearchResponse; investigation: InvestigationResponse; discoveries: InvestigationResponse[] }
 
 export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
   const [intro, setIntro] = useState<IntroPhase>('intro')
@@ -74,66 +76,27 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
     abortRef.current = null
   }
 
-  const scoreInvestigation = (investigation: InvestigationResponse) => {
-    const report = investigation.report
-    const independentPublishers = new Set(
-      report.sources.map(source => {
-        try { return new URL(source.url).hostname.replace(/^www\./, '').toLowerCase() }
-        catch { return source.publisher?.toLowerCase() || source.id }
-      }),
-    ).size
-    const confidenceScore = investigation.discovery.confidence === 'high' ? 3 : investigation.discovery.confidence === 'medium' ? 2 : 1
-    const verifiedClaims = report.evidence?.length ?? 0
-    const sourcedCounterarguments = report.counterarguments.filter(item => Boolean(item.sourceId)).length
-    return confidenceScore + Math.min(verifiedClaims, 5) + Math.min(independentPublishers, 4) +
-      report.calculations.length * 2 + Math.min(report.timeline.length, 3) * 0.5 +
-      sourcedCounterarguments * 0.75
-  }
-
   const runResearch = async (company: string) => {
     const signal = startRequest()
     setFlow({ step: 'researching', company })
     try {
-      const research = await postJson('/api/research', { company }, researchResponseSchema, { signal, mockScenario })
-      if (research.angles.length === 0) {
-        setFlow({ step: 'angles', research })
-        return
-      }
-
-      // Test up to three candidate angles instead of assuming the first model-ranked
-      // hypothesis is the strongest. Each candidate still passes the same validators.
-      const candidates: InvestigationResponse[] = []
-      const errors: string[] = []
-      const anglesToTest = research.angles.slice(0, 3)
-      for (let index = 0; index < anglesToTest.length; index += 1) {
-        const angle = anglesToTest[index]
-        setFlow({ step: 'investigating', research, angleId: angle.id })
-        try {
-          const investigation = await postJson(
-            '/api/research/investigate',
-            { researchId: research.researchId, company: research.company, angleId: angle.id },
-            investigationResponseSchema,
-            { signal, mockScenario },
-          )
-          candidates.push(investigation)
-        } catch (error) {
-          if (isAbortError(error)) return
-          errors.push((error as Error).message)
-        }
-      }
-
-      if (candidates.length === 0) {
-        setFlow({ step: 'investigation-error', research, angleId: anglesToTest[0].id, message: errors[0] || 'No candidate angle could be investigated.' })
-        return
-      }
-
-      const ranked = [...candidates].sort((a, b) => scoreInvestigation(b) - scoreInvestigation(a))
-      setFlow({ step: 'result', research, investigation: ranked[0] })
+      // Search builds the evidence-backed investigation plan first. The user chooses
+      // which hypothesis to investigate, rather than auto-launching five Groq calls
+      // every time a company is searched.
+      const research = await postJson(
+        '/api/research',
+        { company },
+        researchResponseSchema,
+        { signal, mockScenario },
+      )
+      if (signal.aborted) return
+      setFlow({ step: 'angles', research })
     } catch (error) {
       if (isAbortError(error)) return
       setFlow({ step: 'research-error', company, message: (error as Error).message })
     }
   }
+
 
   const runInvestigation = async (research: ResearchResponse, angleId: string) => {
     const signal = startRequest()
@@ -145,7 +108,8 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
         investigationResponseSchema,
         { signal, mockScenario },
       )
-      setFlow({ step: 'result', research, investigation })
+      if (signal.aborted) return
+      setFlow({ step: 'result', research, investigation, discoveries: [investigation] })
     } catch (error) {
       if (isAbortError(error)) return
       setFlow({ step: 'investigation-error', research, angleId, message: (error as Error).message })
@@ -293,7 +257,13 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
           <ReportDashboard
             research={flow.research}
             investigation={flow.investigation}
+            discoveries={flow.discoveries}
             backendMode={backendMode}
+            onSelectDiscovery={angleId => setFlow(current =>
+              current.step === 'result'
+                ? { ...current, investigation: current.discoveries.find(item => item.angleId === angleId) || current.investigation }
+                : current
+            )}
             onExploreAngles={() => setFlow({ step: 'angles', research: flow.research })}
             onFollowupBusyChange={setFollowupBusy}
           />
@@ -329,7 +299,9 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
                 ? 'Searching for fresh support and alternative explanations for ' + activeCompany + '.'
                 : flow.step === 'researching'
                   ? 'Exploring public evidence for ' + activeCompany + '.'
-                  : 'Examining evidence and challenging the hypothesis for ' + activeCompany + '.'}
+                  : flow.step === 'investigating'
+                    ? 'Cross-checking your selected hypothesis for ' + activeCompany + '. SAKURA verifies quoted claims, publisher diversity and primary-source support before presenting a finding.'
+                    : 'Examining evidence and challenging the hypothesis for ' + activeCompany + '.'}
             </p>
             <div className="mx-auto mt-8 h-px w-36 overflow-hidden bg-pink-100/10">
               <div className="h-full w-1/2 animate-[sakura-scan_1.8s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-pink-300 to-transparent" />

@@ -86,6 +86,45 @@ export async function putJson<T>(
   ])
 }
 
+/** Add the newest record to a bounded Redis list, retaining it for the requested TTL. */
+export async function appendJsonList<T>(
+  scope: string,
+  identity: string,
+  value: T,
+  ttlSeconds: number,
+  maxItems = 500,
+): Promise<void> {
+  if (!Number.isSafeInteger(ttlSeconds) || ttlSeconds < 60) {
+    throw new Error('List expiry must be an integer of at least 60 seconds.')
+  }
+  if (!Number.isSafeInteger(maxItems) || maxItems < 1 || maxItems > 5000) {
+    throw new Error('List size must be an integer between 1 and 5000.')
+  }
+
+  const key = makeKey(scope, identity)
+  await redisCommand(['LPUSH', key, JSON.stringify(value)])
+  await redisCommand(['LTRIM', key, '0', String(maxItems - 1)])
+  await redisCommand(['EXPIRE', key, ttlSeconds])
+}
+
+/** Read newest-first values from a bounded Redis list. */
+export async function getJsonList<T>(
+  scope: string,
+  identity: string,
+  limit = 100,
+): Promise<T[]> {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 5000) {
+    throw new Error('List read limit must be an integer between 1 and 5000.')
+  }
+
+  const result = await redisCommand(['LRANGE', makeKey(scope, identity), '0', String(limit - 1)])
+  if (!Array.isArray(result)) return []
+  return result.flatMap(item => {
+    const parsed = parseJson<T>(item)
+    return parsed === null ? [] : [parsed]
+  })
+}
+
 /** Cache reusable search or analysis results. */
 export async function cachedJson<T>(
   scope: string,
