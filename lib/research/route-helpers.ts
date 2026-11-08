@@ -72,6 +72,8 @@ export function errorResponse(error: unknown) {
       message.startsWith('Gemini could not answer that question due to its safety filters.') ||
       message.startsWith('Groq could not find the configured model') ||
       message.startsWith('Groq rate or usage limit reached.') ||
+      message.startsWith("Groq's token-per-minute window is still full") ||
+      message.startsWith('Groq rejected this single request because it') ||
       message.startsWith('Groq analysis request failed (') ||
       message.startsWith('Groq chat request failed (') ||
       message.startsWith('Groq rejected the chat request (') ||
@@ -111,6 +113,7 @@ export function errorResponse(error: unknown) {
         message.startsWith('Web search failed') ||
         message.startsWith('AI analysis failed') ||
         message.startsWith('Groq authentication failed') ||
+        message.startsWith('Groq rejected this single request because it') ||
         message.startsWith('Groq could not find the configured model') ||
         message.startsWith('Groq analysis request failed') ||
         message.startsWith('Groq chat request failed') ||
@@ -119,6 +122,7 @@ export function errorResponse(error: unknown) {
       const quotaError = message.startsWith('Daily Gemini analysis allowance reached') ||
         message.startsWith('Gemini rate or usage limit reached') ||
         message.startsWith('Daily Groq analysis allowance reached') ||
+        message.startsWith("Groq's token-per-minute window is still full") ||
         message.startsWith('Daily Tavily search allowance reached') ||
         message.startsWith('Daily Exa search allowance reached') ||
         message.startsWith('Exa rate or usage limit reached.') ||
