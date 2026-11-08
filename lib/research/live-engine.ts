@@ -1252,6 +1252,100 @@ const ANGLE_RESPONSE_FORMAT: GroqResponseFormat = {
   },
 }
 
+const INVESTIGATION_RESPONSE_FORMAT: GroqResponseFormat = {
+  type: 'json_schema',
+  json_schema: {
+    name: 'sakura_financial_investigation',
+    strict: true,
+    schema: {
+      type: 'object',
+      properties: {
+        headline: { type: 'string' },
+        summary: { type: 'string' },
+        confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
+        confidenceReason: { type: 'string' },
+        whyItMatters: { type: 'array', items: { type: 'string' } },
+        thesis: { type: 'string' },
+        calculationCandidates: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string' },
+              kind: { type: 'string', enum: ['percent_change', 'absolute_change', 'ratio', 'percentage_point_change'] },
+              priorValue: { type: 'number' },
+              currentValue: { type: 'number' },
+              unit: { type: 'string' },
+              priorPeriod: { type: 'string' },
+              currentPeriod: { type: 'string' },
+              priorSourceIndex: { type: 'integer' },
+              currentSourceIndex: { type: 'integer' },
+              priorQuote: { type: 'string' },
+              currentQuote: { type: 'string' },
+              interpretation: { type: 'string' },
+            },
+            required: ['label', 'kind', 'priorValue', 'currentValue', 'unit', 'priorPeriod', 'currentPeriod', 'priorSourceIndex', 'currentSourceIndex', 'priorQuote', 'currentQuote', 'interpretation'],
+            additionalProperties: false,
+          },
+        },
+        evidence: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              claim: { type: 'string' },
+              quote: { type: 'string' },
+              sourceIndex: { type: 'integer' },
+              date: { type: 'string' },
+            },
+            required: ['claim', 'quote', 'sourceIndex', 'date'],
+            additionalProperties: false,
+          },
+        },
+        timeline: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              date: { type: 'string' },
+              event: { type: 'string' },
+              sourceIndex: { type: 'integer' },
+              quote: { type: 'string' },
+            },
+            required: ['date', 'event', 'sourceIndex', 'quote'],
+            additionalProperties: false,
+          },
+        },
+        counterarguments: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              argument: { type: 'string' },
+              assessment: { type: 'string' },
+              sourceIndex: { type: 'integer' },
+            },
+            required: ['argument', 'assessment', 'sourceIndex'],
+            additionalProperties: false,
+          },
+        },
+        falsification: {
+          type: 'object',
+          properties: {
+            condition: { type: 'string' },
+            metric: { type: 'string' },
+            checkBy: { type: 'string' },
+          },
+          required: ['condition', 'metric', 'checkBy'],
+          additionalProperties: false,
+        },
+      },
+      required: ['headline', 'summary', 'confidence', 'confidenceReason', 'whyItMatters', 'thesis', 'calculationCandidates', 'evidence', 'timeline', 'counterarguments', 'falsification'],
+      additionalProperties: false,
+    },
+  },
+}
+
 export async function liveResearch(
   company: string,
   signal?: AbortSignal,
@@ -1786,7 +1880,7 @@ Rules:
 - If evidence is insufficient, explicitly say so rather than manufacturing a discovery.`,
     signal,
     false,
-    { type: 'json_object' },
+    INVESTIGATION_RESPONSE_FORMAT,
     1500
   )
 
