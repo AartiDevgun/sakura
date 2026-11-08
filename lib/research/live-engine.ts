@@ -2422,11 +2422,11 @@ export async function livePeerComparison(
 
   const responseSources = compareSources.map(item => item.source)
   const modelLimitations = Array.isArray(result.limitations)
-    ? result.limitations.filter((value): value is string => typeof value === 'string' && value.trim()).slice(0, 4)
+    ? result.limitations.filter((value): value is string => typeof value === 'string' && Boolean(value.trim())).slice(0, 4)
     : []
   const limitations = [...new Set([...baseLimitations, ...modelLimitations])].slice(0, 6)
   const differences = Array.isArray(result.differences)
-    ? result.differences.filter((value): value is string => typeof value === 'string' && value.trim()).slice(0, 5)
+    ? result.differences.filter((value): value is string => typeof value === 'string' && Boolean(value.trim())).slice(0, 5)
     : []
 
   return {

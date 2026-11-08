@@ -106,7 +106,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ answer })
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    const geminiApiKey = process.env.GEMINI_API_KEY
+    if (!geminiApiKey) {
       throw new Error('Missing environment variable: GEMINI_API_KEY')
     }
 
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
           {
             method: 'POST',
             headers: {
-              'x-goog-api-key': process.env.GEMINI_API_KEY,
+              'x-goog-api-key': geminiApiKey,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
