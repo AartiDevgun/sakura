@@ -914,23 +914,26 @@ async function askForJson(
       const hasGroq = Boolean(process.env.GROQ_API_KEY)
       const hasGemini = Boolean(process.env.GEMINI_API_KEY)
 
-      if (providerPreference && providerPreference !== 'gemini' && providerPreference !== 'groq' && providerPreference !== 'auto') {
-        throw new Error('Invalid SAKURA_RESEARCH_PROVIDER. Use auto, groq, or gemini.')
+      if (providerPreference && !['gemini', 'groq', 'auto'].includes(providerPreference)) {
+        throw new Error('Invalid SAKURA_RESEARCH_PROVIDER. Use gemini, groq, or auto.')
       }
 
-      // Explicit "groq" mode must never silently switch to Gemini, even when the
-      // Groq key is missing. This keeps provider selection predictable and debuggable.
+      // Gemini mode is explicit and authoritative: when selected, never call Groq.
+      if (providerPreference === 'gemini' && !hasGemini) {
+        throw new Error('SAKURA is set to Gemini mode, but GEMINI_API_KEY is not configured for this Vercel deployment.')
+      }
       if (providerPreference === 'groq' && !hasGroq) {
-        throw new Error('SAKURA is set to Groq-only mode, but GROQ_API_KEY is not configured for this Vercel Preview. Add the Groq key and redeploy.')
+        throw new Error('SAKURA is set to Groq-only mode, but GROQ_API_KEY is not configured for this Vercel deployment.')
       }
 
-      // Groq is primary when configured. Auto mode can use Gemini when Groq is
-      // unavailable; explicit groq mode never calls Gemini.
-      const useGeminiFirst = providerPreference !== 'groq' && !hasGroq
+      // Gemini is the selected primary provider in Gemini mode. Auto mode only
+      // uses Groq when explicitly configured; otherwise it starts with Gemini.
+      const useGeminiFirst = providerPreference === 'gemini' ||
+        (providerPreference !== 'groq' && !hasGroq)
 
       if (useGeminiFirst) {
         if (!hasGemini) {
-          throw new Error('No AI provider is configured for this Vercel Preview. Set GROQ_API_KEY, or select Gemini mode and configure GEMINI_API_KEY.')
+          throw new Error('No AI provider is configured. Set GEMINI_API_KEY or explicitly select a configured provider.')
         }
         return askGeminiForJson(system, prompt, signal)
       }
