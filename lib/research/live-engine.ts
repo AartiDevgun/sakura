@@ -852,6 +852,48 @@ type GroqResponseFormat =
       }
     }
 
+function groqTpmRetryDelayMs(response: Response, providerMessage: string) {
+  const retryHeader = response.headers.get('retry-after')
+  const headerSeconds = retryHeader && Number.isFinite(Number(retryHeader))
+    ? Number(retryHeader)
+    : 0
+  const retryAt = retryHeader ? Date.parse(retryHeader) : Number.NaN
+  const dateSeconds = Number.isFinite(retryAt)
+    ? Math.max(0, (retryAt - Date.now()) / 1000)
+    : 0
+  const retryText = providerMessage.match(/(?:try again in|retry in)\s*([\d.]+)\s*s/i)
+  const bodySeconds = retryText ? Number(retryText[1]) : 0
+  const retrySeconds = Math.max(headerSeconds, dateSeconds, bodySeconds, 2)
+
+  // Keep the retry bounded. A longer provider wait is surfaced to the user
+  // rather than holding a serverless request open indefinitely.
+  return Math.min(60_000, Math.ceil(retrySeconds * 1000) + 750)
+}
+
+function waitForGroqRetry(delayMs: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Request cancelled.', 'AbortError'))
+      return
+    }
+
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const onAbort = () => {
+      if (timer) clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
+      reject(new DOMException('Request cancelled.', 'AbortError'))
+    }
+
+    timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, delayMs)
+
+    signal?.addEventListener('abort', onAbort, { once: true })
+    if (signal?.aborted) onAbort()
+  })
+}
+
 async function askForJson(
   system: string,
   prompt: string,
@@ -900,10 +942,10 @@ async function askForJson(
 
         await consumeDailyBudget('groq', limit)
 
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        const requestInit: RequestInit = {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${requiredEnv('GROQ_API_KEY')}`,
+            Authorization: 'Bearer ' + requiredEnv('GROQ_API_KEY'),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -920,7 +962,35 @@ async function askForJson(
           }),
           signal,
           cache: 'no-store',
-        })
+        }
+
+        let response = await fetch('https://api.groq.com/openai/v1/chat/completions', requestInit)
+
+        // A research-plan request can consume part of the rolling TPM window just
+        // before the user selects an angle. Groq supplies a retry-after estimate
+        // for this temporary 429; wait once and resend the same request without
+        // repeating Tavily searches or consuming SAKURA's daily budget again.
+        if (response.status === 429) {
+          const ratePayload = await response.clone().json().catch(() => null) as {
+            error?: { message?: string; code?: string | number }
+          } | null
+          const rateMessage = typeof ratePayload?.error?.message === 'string'
+            ? ratePayload.error.message.replace(/\s+/g, ' ').slice(0, 300)
+            : ''
+
+          if (
+            ratePayload?.error?.code === 'rate_limit_exceeded' &&
+            /tokens per minute|\bTPM\b/i.test(rateMessage)
+          ) {
+            const retryDelayMs = groqTpmRetryDelayMs(response, rateMessage)
+            console.warn('[SAKURA Groq research] TPM window is full; waiting and retrying this request once.', {
+              model: MODEL,
+              retryDelayMs,
+            })
+            await waitForGroqRetry(retryDelayMs, signal)
+            response = await fetch('https://api.groq.com/openai/v1/chat/completions', requestInit)
+          }
+        }
 
         if (!response.ok) {
           const errorPayload = await response.json().catch(() => null) as {
@@ -968,17 +1038,20 @@ async function askForJson(
             (response.status === 429 || response.status === 413) &&
             errorPayload?.error?.code === 'rate_limit_exceeded' &&
             /tokens per minute|\bTPM\b/i.test(providerMessage)
-          if (providerRateMessage) {
-            const retryAfterHeader = Number(response.headers.get('retry-after'))
-            const retryAfterText = providerMessage.match(/(?:try again in|retry in)\s*([\d.]+)\s*s/i)
-            const retrySeconds = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0
-              ? Math.ceil(retryAfterHeader)
-              : retryAfterText
-                ? Math.ceil(Number(retryAfterText[1]))
-                : 30
-            throw new Error(`Groq's token-per-minute window is temporarily full. Wait about ${retrySeconds} seconds before trying again; this is not SAKURA's daily cap.`)
+          if (providerRateMessage && response.status === 413) {
+            const requested = providerMessage.match(/Requested\s+(\d+)/i)?.[1]
+            const limit = providerMessage.match(/Limit\s+(\d+)/i)?.[1]
+            throw new Error(
+              requested && limit
+                ? 'Groq rejected this single request because it asked for ' + requested + ' tokens, above the ' + limit + '-token-per-minute request ceiling. Waiting will not fix an oversized request; SAKURA must reduce the prompt context.'
+                : 'Groq rejected this single request because it exceeds the model token-per-minute request ceiling. Waiting will not fix an oversized request.',
+            )
           }
-
+          if (providerRateMessage) {
+            const retryDelayMs = groqTpmRetryDelayMs(response, providerMessage)
+            const retrySeconds = Math.ceil(retryDelayMs / 1000)
+            throw new Error("Groq's token-per-minute window is still full after SAKURA waited and retried once. Wait about " + retrySeconds + " seconds before trying again; this is not SAKURA's daily cap.")
+          }
           if (response.status === 413) {
             throw new Error('Groq rejected a request that is too large. SAKURA will not retry it repeatedly; try again after the current rate window clears.')
           }
@@ -1007,7 +1080,7 @@ async function askForJson(
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        const groqQuotaReached = /Daily Groq analysis allowance reached|Groq rate or usage limit reached/i.test(message)
+        const groqQuotaReached = /Daily Groq analysis allowance reached|Groq rate or usage limit reached|Groq's token-per-minute window is still full|Groq rejected this single request because it/i.test(message)
         const protectionUnavailable = /SAKURA usage protection is unavailable/i.test(message)
 
         // Never bypass the shared fail-closed budget guard if Redis is unavailable.
