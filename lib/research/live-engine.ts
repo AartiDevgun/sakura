@@ -900,6 +900,7 @@ async function askForJson(
   signal?: AbortSignal,
   jsonRetry = false,
   responseFormat: GroqResponseFormat = { type: 'json_object' },
+  maxCompletionTokens = 1600,
 ): Promise<JsonObject> {
   const geminiModel = process.env.GEMINI_RESEARCH_MODEL || 'gemini-3.8-flash'
   const providerPreference = process.env.SAKURA_RESEARCH_PROVIDER?.toLowerCase()
@@ -907,7 +908,7 @@ async function askForJson(
 
   return cachedJson<JsonObject>(
     cacheScope,
-    `${providerPreference || 'auto'}:${MODEL}:${geminiModel}\0${JSON.stringify(responseFormat)}\0${system}\0${prompt}`,
+    `${providerPreference || 'auto'}:${MODEL}:${geminiModel}\0${JSON.stringify(responseFormat)}\0${maxCompletionTokens}\0${system}\0${prompt}`,
     ANALYSIS_CACHE_TTL_SECONDS,
     async () => {
       const hasGroq = Boolean(process.env.GROQ_API_KEY)
@@ -958,7 +959,7 @@ async function askForJson(
             // GPT-OSS requires an explicit reasoning format when JSON mode is enabled.
             // "hidden" keeps internal reasoning out of the user-facing output.
             reasoning_format: 'hidden',
-            max_completion_tokens: 2000,
+            max_completion_tokens: maxCompletionTokens,
           }),
           signal,
           cache: 'no-store',
@@ -1031,6 +1032,7 @@ async function askForJson(
               signal,
               true,
               responseFormat,
+              maxCompletionTokens,
             )
           }
 
@@ -1783,6 +1785,9 @@ Rules:
 - Source classifications are provenance hints, not proof of truth.
 - If evidence is insufficient, explicitly say so rather than manufacturing a discovery.`,
     signal,
+    false,
+    { type: 'json_object' },
+    1500
   )
 
   const calculations = verifiedCalculations(result.calculationCandidates, sources)

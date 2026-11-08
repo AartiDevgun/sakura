@@ -108,6 +108,7 @@ export function SignalForgeApp({ backendMode }: { backendMode: BackendMode }) {
         investigationResponseSchema,
         { signal, mockScenario },
       )
+      if (signal.aborted) return
       setFlow({ step: 'result', research, investigation, discoveries: [investigation] })
     } catch (error) {
       if (isAbortError(error)) return

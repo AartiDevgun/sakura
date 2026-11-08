@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { callBackend, getBackendMode } from '@/lib/research/backend'
+import { callBackend, getBackendMode, usesLocalResearchEngine } from '@/lib/research/backend'
 import { mockResearch } from '@/lib/research/mock'
 import { liveResearch } from '@/lib/research/live-engine'
 import {
@@ -24,9 +24,7 @@ export async function POST(request: Request) {
     // An explicit provider choice must never be bypassed by the legacy backend
     // or mock path. In Groq-only mode, run the local engine so missing keys or
     // provider errors are reported honestly instead of silently invoking Gemini elsewhere.
-    const providerPreference = process.env.SAKURA_RESEARCH_PROVIDER?.toLowerCase()
-    const forceLocalResearch = providerPreference === 'groq' || providerPreference === 'gemini'
-    if (forceLocalResearch || (process.env.TAVILY_API_KEY && (process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY))) {
+    if (usesLocalResearchEngine()) {
       result = await liveResearch(body.data.company, request.signal)
     } else if (process.env.SIGNALFORGE_API_URL) {
       result = await callBackend(

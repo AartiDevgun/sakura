@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { callBackend, getBackendMode } from '@/lib/research/backend'
+import { callBackend, getBackendMode, usesLocalResearchEngine } from '@/lib/research/backend'
 import { livePeerComparison } from '@/lib/research/live-engine'
 import { mockPeerComparison } from '@/lib/research/mock'
 import {
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     let result
 
     // Keep the peer comparison on the same protected local research engine when available.
-    if (process.env.TAVILY_API_KEY && (process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY)) {
+    if (usesLocalResearchEngine()) {
       result = await livePeerComparison(body.data, request.signal)
     } else if (process.env.SIGNALFORGE_API_URL) {
       result = await callBackend(

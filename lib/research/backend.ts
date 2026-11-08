@@ -3,12 +3,33 @@ import 'server-only'
 import type { z } from 'zod'
 import type { BackendMode } from './schema'
 
+/**
+ * Keep every research stage on the same local evidence engine when selected.
+ * Invalid preferences are routed into the engine so configuration errors are explicit.
+ */
+export function usesLocalResearchEngine(): boolean {
+  const preference = (process.env.SAKURA_RESEARCH_PROVIDER ?? 'auto').toLowerCase()
+  if (preference === 'groq' || preference === 'gemini') return true
+  if (preference !== 'auto') return true
+
+  return Boolean(
+    process.env.TAVILY_API_KEY &&
+    (process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY),
+  )
+}
+
 export function getBackendMode(): BackendMode {
   const externalBackend = Boolean(process.env.SIGNALFORGE_API_URL)
   const hasResearchModel = Boolean(process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY)
   const localResearch = Boolean(process.env.TAVILY_API_KEY && hasResearchModel)
 
-  return externalBackend || localResearch ? 'live' : 'mock'
+  // Demo responses must be explicitly enabled outside production. A production
+  // deployment with missing providers must fail closed, never present mock research.
+  const mockAllowed =
+    process.env.SAKURA_ALLOW_MOCKS === 'true' &&
+    process.env.VERCEL_ENV !== 'production'
+
+  return externalBackend || localResearch || !mockAllowed ? 'live' : 'mock'
 }
 
 export class BackendError extends Error {
